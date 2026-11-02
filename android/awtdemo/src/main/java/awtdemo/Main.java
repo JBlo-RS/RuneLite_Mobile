@@ -19,8 +19,14 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.AWTEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JTextField;
 import java.awt.geom.Ellipse2D;
 
 /** Milestone 2 target: a full-screen Swing window rendered through Caciocavallo. */
@@ -53,22 +59,49 @@ public final class Main {
 
         JPanel south = new JPanel(new FlowLayout(FlowLayout.CENTER, 24, 12));
         south.setOpaque(false);
-        JButton button = new JButton("Click me (input arrives in milestone 3)");
+        JButton button = new JButton("Click me");
         button.setFont(new Font(Font.DIALOG, Font.PLAIN, 20));
         JLabel clicks = new JLabel("clicks: 0");
         clicks.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 20));
         clicks.setForeground(Color.WHITE);
         int[] count = {0};
         button.addActionListener(e -> clicks.setText("clicks: " + ++count[0]));
+        JTextField field = new JTextField("type here", 18);
+        field.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
         south.add(button);
         south.add(clicks);
+        south.add(field);
         root.add(south, BorderLayout.SOUTH);
 
         frame.setContentPane(root);
         frame.setBounds(0, 0, screen.width, screen.height);
         frame.setVisible(true);
 
+        // Show the latest raw input event of any kind, wherever it was delivered
+        Toolkit.getDefaultToolkit().addAWTEventListener(e -> anim.lastEvent = describe(e),
+                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_WHEEL_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
         new Timer(16, e -> anim.repaint()).start();
+    }
+
+    private static String describe(AWTEvent e) {
+        if (e instanceof MouseWheelEvent) {
+            MouseWheelEvent w = (MouseWheelEvent) e;
+            return "MOUSE_WHEEL rotation=" + w.getWheelRotation() + " at " + w.getX() + "," + w.getY();
+        }
+        if (e instanceof MouseEvent) {
+            MouseEvent m = (MouseEvent) e;
+            String id = m.getID() == MouseEvent.MOUSE_PRESSED ? "PRESSED" : m.getID() == MouseEvent.MOUSE_RELEASED
+                    ? "RELEASED" : m.getID() == MouseEvent.MOUSE_CLICKED ? "CLICKED" : "MOUSE#" + m.getID();
+            return "MOUSE_" + id + " button=" + m.getButton() + " at " + m.getX() + "," + m.getY()
+                    + " on " + m.getComponent().getClass().getSimpleName();
+        }
+        if (e instanceof KeyEvent) {
+            KeyEvent k = (KeyEvent) e;
+            String id = k.getID() == KeyEvent.KEY_TYPED ? "TYPED '" + k.getKeyChar() + "'"
+                    : (k.getID() == KeyEvent.KEY_PRESSED ? "PRESSED " : "RELEASED ") + KeyEvent.getKeyText(k.getKeyCode());
+            return "KEY_" + id;
+        }
+        return e.toString();
     }
 
     /** Animated custom painting plus font samples and a repaint-rate counter. */
@@ -76,18 +109,36 @@ public final class Main {
         private final long start = System.nanoTime();
         private long lastSecond = System.nanoTime();
         private int paints, paintsPerSecond;
-        private int tapX = -1, tapY = -1;
+        private int tapX = -1, tapY = -1, tapButton;
+        private final List<int[]> trail = new ArrayList<>();
+        private double zoom = 1.0;
+        volatile String lastEvent = "(no input yet)";
 
         Animation() {
             setOpaque(false);
-            // Shows a marker where clicks land, for milestone 3
-            addMouseListener(new MouseAdapter() {
+            MouseAdapter m = new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     tapX = e.getX();
                     tapY = e.getY();
+                    tapButton = e.getButton();
+                    trail.clear();
                 }
-            });
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    trail.add(new int[]{e.getX(), e.getY()});
+                    if (trail.size() > 300) trail.remove(0);
+                }
+
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    zoom = Math.max(0.3, Math.min(2.0, zoom * Math.pow(0.9, e.getWheelRotation())));
+                }
+            };
+            addMouseListener(m);
+            addMouseMotionListener(m);
+            addMouseWheelListener(m);
         }
 
         @Override
@@ -103,7 +154,7 @@ public final class Main {
             g.fillRoundRect(24, 8, w - 48, h - 16, 24, 24);
 
             // Orbiting circles
-            int cx = w / 2, cy = h / 2, r = Math.min(w, h) / 3;
+            int cx = w / 2, cy = h / 2, r = (int) (Math.min(w, h) / 3 * zoom);
             for (int i = 0; i < 8; i++) {
                 double a = t * 1.5 + i * Math.PI / 4;
                 float hue = (float) ((i / 8.0 + t * 0.1) % 1.0);
@@ -135,10 +186,19 @@ public final class Main {
             }
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 20));
             g.setColor(new Color(0x7CFC00));
-            g.drawString(String.format("Swing repaints: %d/s   t=%.1fs", paintsPerSecond, t), 56, h - 32);
+            g.drawString(String.format("Swing repaints: %d/s   t=%.1fs   zoom=%.2f", paintsPerSecond, t, zoom), 56, h - 32);
+            g.setColor(Color.YELLOW);
+            g.drawString("last event: " + lastEvent, 56, h - 60);
 
+            if (trail.size() > 1) {
+                g.setColor(new Color(0, 255, 255, 180));
+                g.setStroke(new BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                for (int i = 1; i < trail.size(); i++)
+                    g.drawLine(trail.get(i - 1)[0], trail.get(i - 1)[1], trail.get(i)[0], trail.get(i)[1]);
+            }
             if (tapX >= 0) {
-                g.setColor(Color.RED);
+                // red = left, green = middle, orange = right
+                g.setColor(tapButton == 3 ? Color.ORANGE : tapButton == 2 ? Color.GREEN : Color.RED);
                 g.setStroke(new BasicStroke(4f));
                 g.drawLine(tapX - 20, tapY, tapX + 20, tapY);
                 g.drawLine(tapX, tapY - 20, tapX, tapY + 20);

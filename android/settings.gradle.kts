@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "RuneLiteMobile"
-include(":app", ":probe", ":awtdemo")
+include(":app", ":probe", ":awtdemo", ":jvmhelper")

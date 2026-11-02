@@ -16,6 +16,7 @@ abstract class StageRuntimeAssets : DefaultTask() {
     @get:InputFile abstract val probeJar: RegularFileProperty
     @get:InputFile abstract val awtDemoJar: RegularFileProperty
     @get:InputDirectory abstract val cacioDir: DirectoryProperty
+    @get:InputFile abstract val helperJar: RegularFileProperty
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -33,6 +34,8 @@ abstract class StageRuntimeAssets : DefaultTask() {
         cacioDir.get().asFile.listFiles { f -> f.name.endsWith(".jar") }!!.forEach {
             it.copyTo(out.resolve("cacio/" + it.name))
         }
+        // Everything in assets/cacio goes on the JVM's boot class path
+        helperJar.get().asFile.copyTo(out.resolve("cacio/" + helperJar.get().asFile.name))
     }
 }
 
@@ -41,6 +44,7 @@ val stageRuntimeAssets = tasks.register<StageRuntimeAssets>("stageRuntimeAssets"
     probeJar.set(project(":probe").tasks.named<Jar>("jar").flatMap { it.archiveFile })
     awtDemoJar.set(project(":awtdemo").tasks.named<Jar>("jar").flatMap { it.archiveFile })
     cacioDir.set(layout.projectDirectory.dir("cacio"))
+    helperJar.set(project(":jvmhelper").tasks.named<Jar>("jar").flatMap { it.archiveFile })
 }
 
 android {
@@ -52,8 +56,8 @@ android {
         applicationId = "com.jblors.runelitemobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.2.0-m2"
+        versionCode = 6
+        versionName = "0.3.0-m3"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" }

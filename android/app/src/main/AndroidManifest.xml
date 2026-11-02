@@ -27,6 +27,8 @@
             android:name=".JvmActivity"
             android:process=":jvm"
             android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+            android:windowSoftInputMode="adjustNothing|stateHidden"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode" />
     </application>
 </manifest>

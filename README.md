@@ -19,13 +19,13 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 | RuneLite client starts on desktop under Xvfb | done |
 | ARM64 Android JRE 17 (17.0.21, 27 MB `.tar.xz`, 16 KB page aligned) | done |
 | Milestone 1: in-process JVM launcher + probe, all checks pass on Galaxy A56 (Android 16) | done |
-| Milestone 2: Swing via Caciocavallo on a `SurfaceView` (verified on desktop JDK 17) | awaiting device test |
-| Milestone 3: touch / keyboard input | not started |
+| Milestone 2: Swing via Caciocavallo on a `SurfaceView`, smooth at ~60 repaints/s on device | done |
+| Milestone 3: touch / keyboard input (verified on desktop JDK 17) | awaiting device test |
 | Milestone 4: RuneLite launcher | not started |
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.2.0-m2-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.3.0-m3-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -38,6 +38,27 @@ The probe tests JIT, threads, zip, font rendering (freetype) and HTTPS
 (`static.runelite.net`). A good run ends with `ALL CHECKS PASSED`.
 
 Every APK is signed with `android/debug.keystore`, so new builds install over old ones.
+
+## Input
+
+| Gesture | AWT |
+| --- | --- |
+| Tap | left click |
+| Long press (400 ms, haptic) | right click (OSRS context menu) |
+| One-finger drag | left-button drag |
+| Two-finger drag | middle-button drag (OSRS camera) |
+| Pinch | mouse wheel (zoom) |
+| ⌨ button | soft keyboard; text arrives as `KEY_TYPED`, Backspace/Enter as key presses |
+| Hardware keyboard / mouse | mapped directly |
+
+Implementation notes:
+
+- This Cacio build's `CTCRobotPeer.mousePress` wants the legacy masks
+  `BUTTON1_MASK`=16, `BUTTON2_MASK`=8 and `BUTTON3_MASK`=4. The `*_DOWN_MASK`
+  values only work for button 1; for the others they produce events with
+  button 0, which crash AWT's `LightweightDispatcher`.
+- `CTCRobotPeer.mouseWheel` does nothing, so wheel events come from
+  `com.jblors.rlm.AndroidInput` (`android/jvmhelper`) on the boot class path.
 
 ## Building the APK
 

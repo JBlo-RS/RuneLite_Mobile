@@ -29,6 +29,8 @@ static jclass cls_screen;      // CTCScreen (global ref, JDK side)
 static jmethodID m_get_rgb;
 static jclass cls_input;       // CTCAndroidInput (global ref, JDK side)
 static jmethodID m_receive;
+static jclass cls_helper;      // com.jblors.rlm.AndroidInput (our boot-classpath helper)
+static jmethodID m_wheel;
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     if (art_vm == NULL) {
@@ -67,6 +69,15 @@ static jboolean check_clear(JNIEnv *env, const char *what) {
     return JNI_FALSE;
 }
 
+// Like check_clear, but silent: for calls expected to fail briefly during startup
+static jboolean clear_quiet(JNIEnv *env) {
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
+}
+
 static jclass find_global(JNIEnv *env, const char *name) {
     jclass c = (*env)->FindClass(env, name);
     if (check_clear(env, name) || c == NULL) return NULL;
@@ -94,8 +105,10 @@ Java_com_jblors_runelitemobile_AwtBridge_renderFrame(JNIEnv *aenv, jclass clazz,
         if (check_clear(jenv, "getCurrentScreenRGB lookup") || m_get_rgb == NULL) return JNI_FALSE;
     }
 
+    // jdk_vm is set while CTCScreen.<clinit> is still running, so until its instance exists
+    // this throws NullPointerException; that just means "no frame yet".
     jintArray arr = (jintArray) (*jenv)->CallStaticObjectMethod(jenv, cls_screen, m_get_rgb);
-    if (check_clear(jenv, "getCurrentScreenRGB") || arr == NULL) return JNI_FALSE;
+    if (clear_quiet(jenv) || arr == NULL) return JNI_FALSE;
 
     AndroidBitmapInfo info;
     if (AndroidBitmap_getInfo(aenv, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS ||
@@ -146,6 +159,21 @@ Java_com_jblors_runelitemobile_AwtBridge_sendInput(JNIEnv *aenv, jclass clazz,
     }
     (*jenv)->CallStaticVoidMethod(jenv, cls_input, m_receive, type, a, b, c, d);
     check_clear(jenv, "receiveData");
+}
+
+// Mouse wheel via com.jblors.rlm.AndroidInput.wheel (Cacio's robot ignores the wheel).
+JNIEXPORT void JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_sendScroll(JNIEnv *aenv, jclass clazz, jint x, jint y, jint rotation) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL) return;
+    if (m_wheel == NULL) {
+        cls_helper = find_global(jenv, "com/jblors/rlm/AndroidInput");
+        if (cls_helper == NULL) return;
+        m_wheel = (*jenv)->GetStaticMethodID(jenv, cls_helper, "wheel", "(III)V");
+        if (check_clear(jenv, "wheel lookup") || m_wheel == NULL) return;
+    }
+    (*jenv)->CallStaticVoidMethod(jenv, cls_helper, m_wheel, x, y, rotation);
+    check_clear(jenv, "wheel");
 }
 
 // CTCClipboard natives. Clipboard sharing with Android comes later; until then

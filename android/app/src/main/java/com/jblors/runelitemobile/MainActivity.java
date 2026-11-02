@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
         });
 
         TextView title = new TextView(this);
-        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 2: Swing on screen");
+        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 3: touch & keyboard input");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         root.addView(title);

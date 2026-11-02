@@ -78,6 +78,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     private volatile SurfaceHolder surface;
     private volatile boolean rendering;
     private int screenW, screenH;
+    // Where the virtual screen is drawn inside the SurfaceView (set by the render loop)
+    private volatile int dstL, dstT, dstW = 1, dstH = 1;
+    private volatile String lastGesture = "";
+    private KeyboardSink keyboard;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -151,8 +155,40 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         root.setBackgroundColor(Color.BLACK);
         SurfaceView sv = new SurfaceView(this);
         sv.getHolder().addCallback(this);
+        TouchInput touch = new TouchInput(getResources().getDisplayMetrics().density,
+                new TouchInput.Mapper() {
+                    @Override
+                    public int toScreenX(float x) {
+                        return clamp(Math.round((x - dstL) * screenW / (float) dstW), screenW);
+                    }
+
+                    @Override
+                    public int toScreenY(float y) {
+                        return clamp(Math.round((y - dstT) * screenH / (float) dstH), screenH);
+                    }
+                }, g -> lastGesture = g);
+        sv.setOnTouchListener(touch);
+        sv.setOnGenericMotionListener(touch);
         root.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        keyboard = new KeyboardSink(this, t -> lastGesture = t);
+        root.addView(keyboard, new FrameLayout.LayoutParams(1, 1));
+
+        TextView kb = new TextView(this);
+        kb.setText("⌨");
+        kb.setTextSize(24);
+        kb.setTextColor(Color.WHITE);
+        kb.setGravity(Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0x66000000);
+        bg.setCornerRadius(dp(12));
+        kb.setBackground(bg);
+        kb.setOnClickListener(v -> keyboard.toggle());
+        FrameLayout.LayoutParams kblp = new FrameLayout.LayoutParams(dp(52), dp(52),
+                Gravity.BOTTOM | Gravity.END);
+        kblp.setMargins(0, 0, dp(12), dp(12));
+        root.addView(kb, kblp);
         status = new TextView(this);
         status.setTextColor(0xFFFFFF00);
         status.setBackgroundColor(0x80000000);
@@ -164,6 +200,25 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 Gravity.TOP | Gravity.START));
         setContentView(root);
         hideSystemBars(root);
+    }
+
+    private static int clamp(int v, int max) {
+        return v < 0 ? 0 : Math.min(v, max - 1);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        int code = event.getKeyCode();
+        boolean system = code == android.view.KeyEvent.KEYCODE_BACK
+                || code == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                || code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN;
+        // Hardware keyboards; soft keyboard input arrives through KeyboardSink instead
+        if (MODE_SWING_DEMO.equals(mode) && !system && KeyboardSink.handleKey(event)) return true;
+        return super.dispatchKeyEvent(event);
     }
 
     private void hideSystemBars(View v) {
@@ -230,6 +285,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                     float scale = Math.min(cw / (float) screenW, ch / (float) screenH);
                     int w = Math.round(screenW * scale), h = Math.round(screenH * scale);
                     dst.set((cw - w) / 2, (ch - h) / 2, (cw - w) / 2 + w, (ch - h) / 2 + h);
+                    dstL = dst.left;
+                    dstT = dst.top;
+                    dstW = Math.max(1, w);
+                    dstH = Math.max(1, h);
                     c.drawColor(Color.BLACK);
                     c.drawBitmap(frame, null, dst, paint);
                 } catch (RuntimeException e) {
@@ -247,8 +306,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             long now = System.nanoTime();
             if (now - windowStart >= 1_000_000_000L) {
                 float fps = frames * 1e9f / (now - windowStart);
+                String g = lastGesture;
                 setStatus(AwtBridge.isReady()
-                        ? String.format("%dx%d  %.0f fps (bridge)", screenW, screenH, fps)
+                        ? String.format("%dx%d  %.0f fps%s", screenW, screenH, fps,
+                                g.isEmpty() ? "" : "   last input: " + g)
                         : "Waiting for AWT…");
                 frames = 0;
                 windowStart = now;
