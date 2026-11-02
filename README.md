@@ -25,7 +25,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.5.1-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.5.2-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -69,6 +69,12 @@ Implementation notes:
 - Cacio does not support `MAXIMIZED_BOTH`, so RuneLite widened the window when the sidebar
   opened, pushing it off screen. `WindowManager` records the maximized state in `Frame`
   itself and keeps maximized frames at screen size.
+- All windows share Cacio's single screen buffer, and every `Graphics` Cacio hands out is
+  clipped to the windows that existed when it was created. The game keeps one `Graphics`
+  for its `Canvas`, so every game frame painted over dialogs opened later (for example
+  RuneLite's colour picker). `com.jblors.rlm.ScreenCompositor` redraws each dialog and
+  popup from its own Swing root pane about 30 times a second and draws them on top of the
+  frame sent to Android. Input already follows Cacio's real window order.
 - `CTCRobotPeer.mouseWheel` does nothing, so wheel events come from
   `com.jblors.rlm.AndroidInput` (`android/jvmhelper`) on the boot class path.
 

@@ -25,7 +25,7 @@
 static JavaVM *art_vm;
 static _Atomic(JavaVM *) jdk_vm;
 
-static jclass cls_screen;      // CTCScreen (global ref, JDK side)
+static jclass cls_screen;      // com.jblors.rlm.ScreenCompositor (global ref, JDK side)
 static jmethodID m_get_rgb;
 static jclass cls_input;       // CTCAndroidInput (global ref, JDK side)
 static jmethodID m_receive;
@@ -99,10 +99,12 @@ Java_com_jblors_runelitemobile_AwtBridge_renderFrame(JNIEnv *aenv, jclass clazz,
     if (jenv == NULL) return JNI_FALSE;
 
     if (m_get_rgb == NULL) {
-        cls_screen = find_global(jenv, "com/github/caciocavallosilano/cacio/ctc/CTCScreen");
+        // ScreenCompositor.screenRGB() = CTCScreen.getCurrentScreenRGB() with dialogs and popups
+        // re-drawn on top (the game's cached Graphics paints over them in the shared buffer)
+        cls_screen = find_global(jenv, "com/jblors/rlm/ScreenCompositor");
         if (cls_screen == NULL) return JNI_FALSE;
-        m_get_rgb = (*jenv)->GetStaticMethodID(jenv, cls_screen, "getCurrentScreenRGB", "()[I");
-        if (check_clear(jenv, "getCurrentScreenRGB lookup") || m_get_rgb == NULL) return JNI_FALSE;
+        m_get_rgb = (*jenv)->GetStaticMethodID(jenv, cls_screen, "screenRGB", "()[I");
+        if (check_clear(jenv, "screenRGB lookup") || m_get_rgb == NULL) return JNI_FALSE;
     }
 
     // jdk_vm is set while CTCScreen.<clinit> is still running, so until its instance exists
@@ -187,6 +189,15 @@ Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jcla
     if (!check_clear(jenv, "WindowManager.install lookup") && install != NULL) {
         (*jenv)->CallStaticVoidMethod(jenv, wm, install);
         check_clear(jenv, "WindowManager.install");
+    }
+    jclass comp = (*jenv)->FindClass(jenv, "com/jblors/rlm/ScreenCompositor");
+    if (!check_clear(jenv, "ScreenCompositor lookup") && comp != NULL) {
+        jmethodID start = (*jenv)->GetStaticMethodID(jenv, comp, "start", "()V");
+        if (!check_clear(jenv, "ScreenCompositor.start lookup") && start != NULL) {
+            (*jenv)->CallStaticVoidMethod(jenv, comp, start);
+            check_clear(jenv, "ScreenCompositor.start");
+        }
+        (*jenv)->DeleteLocalRef(jenv, comp);
     }
     (*jenv)->DeleteLocalRef(jenv, wm);
 }
