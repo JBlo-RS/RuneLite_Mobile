@@ -25,7 +25,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.4.1-m4-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.4.2-m4-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -63,6 +63,12 @@ Implementation notes:
   use. It does not show in `MouseEvent.isAltDown()`, because Cacio does not track Alt
   in its robot. Forcing the modifier bit makes clicks come out as button 0, because
   the legacy `ALT_MASK` equals `BUTTON2_MASK`. Shift and Ctrl do show on mouse events.
+- Cacio gives no component keyboard focus on click, so nothing owned focus and key input
+  never reached the game's `Canvas`. The jvmhelper `WindowManager` adds click-to-focus for
+  heavyweight components and focuses new windows.
+- Cacio does not support `MAXIMIZED_BOTH`, so RuneLite widened the window when the sidebar
+  opened, pushing it off screen. `WindowManager` records the maximized state in `Frame`
+  itself and keeps maximized frames at screen size.
 - `CTCRobotPeer.mouseWheel` does nothing, so wheel events come from
   `com.jblors.rlm.AndroidInput` (`android/jvmhelper`) on the boot class path.
 
