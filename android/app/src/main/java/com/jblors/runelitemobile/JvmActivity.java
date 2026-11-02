@@ -43,8 +43,22 @@ public class JvmActivity extends Activity {
         text.setTypeface(android.graphics.Typeface.MONOSPACE);
         text.setTextSize(11);
         text.setPadding(24, 24, 24, 24);
+        text.setTextColor(0xFFE0E0E0);
         scroll = new ScrollView(this);
+        scroll.setBackgroundColor(0xFF121212);
         scroll.addView(text);
+        // Edge-to-edge on Android 15+: keep the log clear of the system bars
+        scroll.setOnApplyWindowInsetsListener((v, insets) -> {
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets b = insets.getInsets(android.view.WindowInsets.Type.systemBars()
+                        | android.view.WindowInsets.Type.displayCutout());
+                v.setPadding(b.left, b.top, b.right, b.bottom);
+                return android.view.WindowInsets.CONSUMED;
+            }
+            v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            return insets.consumeSystemWindowInsets();
+        });
         setContentView(scroll);
 
         log = logFile(this);

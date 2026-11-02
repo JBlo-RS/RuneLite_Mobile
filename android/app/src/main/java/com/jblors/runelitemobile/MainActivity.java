@@ -2,8 +2,14 @@ package com.jblors.runelitemobile;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -23,26 +29,34 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 48, 32, 32);
+        root.setBackgroundColor(0xFF121212);
+        // targetSdk 35 is edge-to-edge on Android 15+: keep content clear of the status,
+        // navigation and cutout areas.
+        final int pad = dp(16);
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            if (Build.VERSION.SDK_INT >= 30) {
+                Insets b = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                v.setPadding(b.left + pad, b.top + pad, b.right + pad, b.bottom + pad);
+                return WindowInsets.CONSUMED;
+            }
+            v.setPadding(insets.getSystemWindowInsetLeft() + pad, insets.getSystemWindowInsetTop() + pad,
+                    insets.getSystemWindowInsetRight() + pad, insets.getSystemWindowInsetBottom() + pad);
+            return insets.consumeSystemWindowInsets();
+        });
 
         TextView title = new TextView(this);
         title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 1: JVM smoke test");
+        title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         root.addView(title);
 
-        LinearLayout buttons = new LinearLayout(this);
-        Button run = new Button(this);
-        run.setText("Run JVM probe");
-        run.setOnClickListener(v -> startActivity(new Intent(this, JvmActivity.class)));
-        Button share = new Button(this);
-        share.setText("Share log");
-        share.setOnClickListener(v -> shareLog());
-        buttons.addView(run);
-        buttons.addView(share);
-        root.addView(buttons);
+        root.addView(bigButton("▶  Run JVM probe", 0xFF2E7D32,
+                v -> startActivity(new Intent(this, JvmActivity.class))));
+        root.addView(bigButton("Share log", 0xFF1565C0, v -> shareLog()));
 
         logView = new TextView(this);
         logView.setTypeface(Typeface.MONOSPACE);
+        logView.setTextColor(0xFFE0E0E0);
         logView.setTextSize(11);
         logView.setTextIsSelectable(true);
         ScrollView scroll = new ScrollView(this);
@@ -50,6 +64,28 @@ public class MainActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
+    }
+
+    private Button bigButton(String label, int color, View.OnClickListener onClick) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(20);
+        b.setTextColor(Color.WHITE);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(12));
+        b.setBackground(bg);
+        b.setOnClickListener(onClick);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(64));
+        lp.topMargin = dp(12);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
     @Override
@@ -60,7 +96,7 @@ public class MainActivity extends Activity {
 
     private String readLog() {
         File f = JvmActivity.logFile(this);
-        if (!f.isFile()) return "No log yet. Tap \"Run JVM probe\".";
+        if (!f.isFile()) return "No log yet. Tap the green \"Run JVM probe\" button above.";
         try {
             return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
         } catch (IOException e) {
