@@ -28,11 +28,20 @@ import javax.swing.JComponent;
  *   input never reaches the game. (Swing components already request focus themselves.)</li>
  * </ul>
  *
+ * <ul>
+ *   <li>Dialogs and other owned windows are kept on screen and above their owner: when the
+ *   owner is activated, its showing owned windows are raised again (without taking focus),
+ *   as desktop window managers do for transient windows.</li>
+ *   <li>Window lifecycle events are logged (prefix "rlm-wm") so problems show up in the
+ *   app's shared log.</li>
+ * </ul>
+ *
  * <p>Installed from the Android side once Caciocavallo's screen exists (AWT is up by then).
  * It must not run earlier: initializing the toolkit before the RuneLite launcher sets its
  * display system properties would make those settings ineffective.
  */
 public final class WindowManager {
+    private static final boolean DEBUG = Boolean.getBoolean("rlm.wm.debug");
     private static volatile boolean installed;
     private static Field frameState;
 
@@ -43,7 +52,7 @@ public final class WindowManager {
         installed = true;
         EventQueue.invokeLater(() -> {
             Toolkit.getDefaultToolkit().addAWTEventListener(WindowManager::onEvent,
-                    AWTEvent.WINDOW_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
+                    AWTEvent.WINDOW_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.COMPONENT_EVENT_MASK);
             for (Window w : Window.getWindows()) {
                 if (w instanceof Frame && w.isShowing()) fill((Frame) w);
             }
@@ -63,13 +72,33 @@ public final class WindowManager {
             case WindowEvent.WINDOW_OPENED:
                 if (e.getSource() instanceof Window) {
                     Window w = (Window) e.getSource();
+                    log("opened", w);
                     // Let the app finish its own sizing/positioning first
                     EventQueue.invokeLater(() -> {
                         if (w instanceof Frame) fill((Frame) w);
+                        else keepOnScreen(w);
                         w.toFront();
                         w.requestFocus();
                     });
                 }
+                break;
+            case WindowEvent.WINDOW_ACTIVATED:
+                if (e.getSource() instanceof Window) {
+                    Window w = (Window) e.getSource();
+                    log("activated", w);
+                    raiseOwnedWindows(w);
+                }
+                break;
+            case WindowEvent.WINDOW_DEACTIVATED:
+            case WindowEvent.WINDOW_CLOSING:
+            case WindowEvent.WINDOW_CLOSED:
+                if (e.getSource() instanceof Window) {
+                    log(e.getID() == WindowEvent.WINDOW_DEACTIVATED ? "deactivated"
+                            : e.getID() == WindowEvent.WINDOW_CLOSING ? "closing" : "closed", (Window) e.getSource());
+                }
+                break;
+            case java.awt.event.ComponentEvent.COMPONENT_HIDDEN:
+                if (e.getSource() instanceof Window) log("hidden", (Window) e.getSource());
                 break;
             case MouseEvent.MOUSE_PRESSED:
                 Component c = ((MouseEvent) e).getComponent();
@@ -84,6 +113,38 @@ public final class WindowManager {
         }
     }
 
+    /** Re-raise the owner's showing dialogs above it without moving focus. */
+    private static void raiseOwnedWindows(Window owner) {
+        for (Window w : owner.getOwnedWindows()) {
+            if (!w.isShowing()) continue;
+            boolean auto = w.isAutoRequestFocus();
+            w.setAutoRequestFocus(false);
+            w.toFront();
+            w.setAutoRequestFocus(auto);
+            log("raised above owner", w);
+        }
+    }
+
+    /** Move a (non-maximized) window so it is entirely on the virtual screen. */
+    private static void keepOnScreen(Window w) {
+        if (!w.isShowing()) return;
+        Rectangle screen = w.getGraphicsConfiguration().getBounds();
+        Rectangle b = w.getBounds();
+        int x = Math.max(screen.x, Math.min(b.x, screen.x + screen.width - b.width));
+        int y = Math.max(screen.y, Math.min(b.y, screen.y + screen.height - b.height));
+        if (x != b.x || y != b.y) {
+            w.setLocation(x, y);
+            log("moved on screen", w);
+        }
+    }
+
+    private static void log(String what, Window w) {
+        String title = w instanceof Frame ? ((Frame) w).getTitle()
+                : w instanceof java.awt.Dialog ? ((java.awt.Dialog) w).getTitle() : w.getClass().getSimpleName();
+        System.out.println("rlm-wm: " + what + " " + w.getClass().getSimpleName() + " '" + title + "' "
+                + w.getBounds().x + "," + w.getBounds().y + " " + w.getWidth() + "x" + w.getHeight());
+    }
+
     private static void fill(Frame f) {
         if (!f.isResizable() || !f.isShowing()) return;
         Rectangle screen = screenOf(f);
@@ -92,6 +153,7 @@ public final class WindowManager {
             if (!isMaximized(f)) forceMaximizedState(f);
         }
         if (!f.getBounds().equals(screen)) {
+            if (DEBUG) System.out.println("rlm-wm: refit '" + f.getTitle() + "' " + f.getBounds() + " -> " + screen);
             f.setBounds(screen);
             f.validate();
         }
