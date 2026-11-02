@@ -17,8 +17,34 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 | Android SDK (platform 36, build-tools 36.1.0), NDK r27b + r30, CMake 3.31.6 | done |
 | RuneLite builds and tests pass (723 tests, 0 failures) | done |
 | RuneLite client starts on desktop under Xvfb | done |
-| ARM64 Android JRE 17 (17.0.21, 27 MB `.tar.xz`), built; not yet run on a device | done |
-| Android app (JVM launcher, Cacio surface, input) | not started |
+| ARM64 Android JRE 17 (17.0.21, 27 MB `.tar.xz`, 16 KB page aligned) | done |
+| Milestone 1: in-process JVM launcher + probe (`apk/`) | awaiting device test |
+| Milestone 2: AWT via Caciocavallo on a `SurfaceView` | not started |
+| Milestone 3: touch / keyboard input | not started |
+| Milestone 4: RuneLite launcher | not started |
+
+## Trying the APK
+
+1. Download `apk/runelite-mobile-0.1.0-m1-debug.apk` on the phone (ARM64, Android 8+)
+   and install it. Allow installs from your browser/files app when asked.
+2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
+   which takes a few seconds.
+3. When it finishes it drops back to the main screen. Tap **Share log** and send
+   the text.
+
+The probe tests JIT, threads, zip, font rendering (freetype) and HTTPS
+(`static.runelite.net`). A good run ends with `ALL CHECKS PASSED`.
+
+Every APK is signed with `android/debug.keystore`, so new builds install over old ones.
+
+## Building the APK
+
+```bash
+cd android && ./gradlew :app:assembleDebug
+```
+
+This needs the Android SDK with NDK r27b and CMake 3.31.6. It bundles the newest
+`assets/jre17-arm64-*-release.tar.xz`.
 
 ## Building RuneLite in a restricted sandbox
 
