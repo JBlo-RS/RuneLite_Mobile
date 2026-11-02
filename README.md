@@ -18,14 +18,14 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 | RuneLite builds and tests pass (723 tests, 0 failures) | done |
 | RuneLite client starts on desktop under Xvfb | done |
 | ARM64 Android JRE 17 (17.0.21, 27 MB `.tar.xz`, 16 KB page aligned) | done |
-| Milestone 1: in-process JVM launcher + probe (`apk/`) | awaiting device test |
+| Milestone 1: in-process JVM launcher + probe, all checks pass on Galaxy A56 (Android 16) | done |
 | Milestone 2: AWT via Caciocavallo on a `SurfaceView` | not started |
 | Milestone 3: touch / keyboard input | not started |
 | Milestone 4: RuneLite launcher | not started |
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.1.2-m1-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.1.3-m1-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.

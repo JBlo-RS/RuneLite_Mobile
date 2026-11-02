@@ -112,6 +112,38 @@ Java_com_jblors_runelitemobile_NativeBridge_redirectStdio(JNIEnv *env, jclass cl
 }
 
 // ---------------------------------------------------------------------------
+// System.exit() ends in libc exit(), which runs C++ static destructors and other
+// atexit work. Inside an app process that tears down state (e.g. mutexes) other
+// threads still use, and bionic aborts with "FORTIFY: pthread_mutex_lock called
+// on a destroyed mutex". Handlers run in reverse registration order, so one
+// registered just before the JVM starts runs before those: drain the log and
+// leave with _exit(), skipping the rest. The JVM has already run its shutdown
+// hooks by the time exit() is called.
+
+static void drain_log_pipe(void) {
+    if (log_pipe[0] < 0) return;
+    fflush(stdout);
+    fflush(stderr);
+    int flags = fcntl(log_pipe[0], F_GETFL);
+    fcntl(log_pipe[0], F_SETFL, flags | O_NONBLOCK);
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(log_pipe[0], buf, sizeof(buf))) > 0)
+        if (log_fd >= 0) write(log_fd, buf, (size_t) n);
+}
+
+static void on_exit_fast(void) {
+    drain_log_pipe();
+    if (log_fd >= 0) {
+        static const char msg[] = "== JVM called exit(); leaving via _exit()\n";
+        write(log_fd, msg, sizeof(msg) - 1);
+        fsync(log_fd);
+    }
+    LOGI("exit() intercepted, calling _exit(0)");
+    _exit(0);
+}
+
+// ---------------------------------------------------------------------------
 // Launch. argv[0] must be "java" (no slash): the JRE's Android patch then takes
 // the Java home from $JAVA_HOME instead of /proc/self/exe (app_process).
 
@@ -142,6 +174,9 @@ Java_com_jblors_runelitemobile_NativeBridge_launchJvm(JNIEnv *env, jclass clazz,
         (*env)->ReleaseStringUTFChars(env, s, c);
         (*env)->DeleteLocalRef(env, s);
     }
+
+    // Register last so it runs first (see on_exit_fast)
+    atexit(on_exit_fast);
 
     LOGI("calling JLI_Launch with %d args", argc);
     jint rc = launch(argc, argv, 0, NULL, 0, NULL,
