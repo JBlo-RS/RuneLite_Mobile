@@ -40,6 +40,9 @@ final class AwtBridge {
     /** Mouse wheel at a screen position; negative rotation = scroll up / zoom in. */
     static native void sendScroll(int x, int y, int rotation);
 
+    /** Maximizes resizable Java frames to the virtual screen (see jvmhelper WindowManager). */
+    static native void installWindowManager();
+
     // ------------------------------------------------------------ convenience
 
     static void mouseMove(int x, int y) {

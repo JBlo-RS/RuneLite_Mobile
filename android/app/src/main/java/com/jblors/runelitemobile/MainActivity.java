@@ -45,11 +45,13 @@ public class MainActivity extends Activity {
         });
 
         TextView title = new TextView(this);
-        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 3: touch & keyboard input");
+        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 4: RuneLite launcher");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         root.addView(title);
 
+        root.addView(bigButton("▶  Launch RuneLite", 0xFFB35C00,
+                v -> startActivity(JvmActivity.intent(this, JvmActivity.MODE_RUNELITE))));
         root.addView(bigButton("▶  Run Swing demo", 0xFF6A1B9A,
                 v -> startActivity(JvmActivity.intent(this, JvmActivity.MODE_SWING_DEMO))));
         root.addView(bigButton("▶  Run JVM probe", 0xFF2E7D32,

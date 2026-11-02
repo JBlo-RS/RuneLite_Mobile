@@ -47,12 +47,29 @@ import java.util.List;
  * <ul>
  *   <li>{@link #MODE_PROBE}: headless smoke test, output shown as text.</li>
  *   <li>{@link #MODE_SWING_DEMO}: Swing on Caciocavallo, frames drawn to a SurfaceView.</li>
+ *   <li>{@link #MODE_RUNELITE}: the stock RuneLite launcher on Caciocavallo, REFLECT mode.</li>
  * </ul>
  */
 public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final String EXTRA_MODE = "mode";
     static final String MODE_PROBE = "probe";
     static final String MODE_SWING_DEMO = "swing-demo";
+    static final String MODE_RUNELITE = "runelite";
+
+    /**
+     * RuneLite's clientJvm17Arguments from bootstrap.json. In REFLECT mode the launcher runs
+     * the client in its own JVM and cannot apply these, so we pass them up front.
+     */
+    private static final String[] RUNELITE_JVM_ARGS = {
+            "-XX:+DisableAttachMechanism",
+            "-Xss2m",
+            "-XX:CompileThreshold=1500",
+            "--add-opens=java.base/java.net=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
+            // launcherJvm17Arguments + run the client in this JVM (forking is impossible here)
+            "-Drunelite.launcher.nojvm=true",
+            "-Drunelite.launcher.reflect=true",
+    };
 
     /** Height of the virtual AWT screen; width follows the display's aspect ratio. */
     private static final int SCREEN_HEIGHT = 720;
@@ -91,7 +108,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         log = logFile(this);
         log.delete();
 
-        if (MODE_SWING_DEMO.equals(mode)) {
+        if (isGraphical()) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             computeScreenSize();
             buildDemoUi();
@@ -202,6 +219,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         hideSystemBars(root);
     }
 
+    private boolean isGraphical() {
+        return MODE_SWING_DEMO.equals(mode) || MODE_RUNELITE.equals(mode);
+    }
+
     private static int clamp(int v, int max) {
         return v < 0 ? 0 : Math.min(v, max - 1);
     }
@@ -217,7 +238,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 || code == android.view.KeyEvent.KEYCODE_VOLUME_UP
                 || code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN;
         // Hardware keyboards; soft keyboard input arrives through KeyboardSink instead
-        if (MODE_SWING_DEMO.equals(mode) && !system && KeyboardSink.handleKey(event)) return true;
+        if (isGraphical() && !system && KeyboardSink.handleKey(event)) return true;
         return super.dispatchKeyEvent(event);
     }
 
@@ -276,6 +297,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 if (!announced) {
                     announced = true;
                     append("== first AWT frame received (" + screenW + "x" + screenH + ")");
+                    // AWT is initialized by now (the app did it), so it's safe to hook windows
+                    AwtBridge.installWindowManager();
                 }
                 Canvas c = null;
                 try {
@@ -349,16 +372,18 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             File jre = JreInstaller.ensureInstalled(this, this::append);
             File jars = new File(getFilesDir(), "jars");
             List<String> args = new ArrayList<>();
-            if (MODE_SWING_DEMO.equals(mode)) {
+            if (isGraphical()) {
                 AwtBridge.init(); // ART must load libpojavexec_awt.so before the JVM does
                 File cacio = new File(getFilesDir(), "cacio");
                 JreInstaller.deleteRecursively(cacio);
                 for (String name : getAssets().list("cacio"))
                     JreInstaller.copyAsset(this, "cacio/" + name, new File(cacio, name));
-                File demo = JreInstaller.copyAsset(this, "awtdemo.jar", new File(jars, "awtdemo.jar"));
                 args.addAll(JvmLauncher.cacioArgs(cacio, screenW, screenH));
+                String jarName = MODE_RUNELITE.equals(mode) ? "RuneLite.jar" : "awtdemo.jar";
+                if (MODE_RUNELITE.equals(mode)) args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
+                File jar = JreInstaller.copyAsset(this, jarName, new File(jars, jarName));
                 args.add("-jar");
-                args.add(demo.getAbsolutePath());
+                args.add(jar.getAbsolutePath());
             } else {
                 File probe = JreInstaller.copyAsset(this, "probe.jar", new File(jars, "probe.jar"));
                 args.add("-Djava.awt.headless=true");

@@ -17,6 +17,7 @@ abstract class StageRuntimeAssets : DefaultTask() {
     @get:InputFile abstract val awtDemoJar: RegularFileProperty
     @get:InputDirectory abstract val cacioDir: DirectoryProperty
     @get:InputFile abstract val helperJar: RegularFileProperty
+    @get:InputFile abstract val launcherJar: RegularFileProperty
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -36,6 +37,7 @@ abstract class StageRuntimeAssets : DefaultTask() {
         }
         // Everything in assets/cacio goes on the JVM's boot class path
         helperJar.get().asFile.copyTo(out.resolve("cacio/" + helperJar.get().asFile.name))
+        launcherJar.get().asFile.copyTo(out.resolve("RuneLite.jar"))
     }
 }
 
@@ -45,6 +47,8 @@ val stageRuntimeAssets = tasks.register<StageRuntimeAssets>("stageRuntimeAssets"
     awtDemoJar.set(project(":awtdemo").tasks.named<Jar>("jar").flatMap { it.archiveFile })
     cacioDir.set(layout.projectDirectory.dir("cacio"))
     helperJar.set(project(":jvmhelper").tasks.named<Jar>("jar").flatMap { it.archiveFile })
+    // Stock RuneLite launcher, built by tools/build-launcher.sh
+    launcherJar.set(layout.projectDirectory.file("runelite/RuneLite.jar"))
 }
 
 android {
@@ -56,8 +60,8 @@ android {
         applicationId = "com.jblors.runelitemobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.3.0-m3"
+        versionCode = 7
+        versionName = "0.4.0-m4"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" }

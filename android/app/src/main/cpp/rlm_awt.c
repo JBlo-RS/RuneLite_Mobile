@@ -176,6 +176,21 @@ Java_com_jblors_runelitemobile_AwtBridge_sendScroll(JNIEnv *aenv, jclass clazz, 
     check_clear(jenv, "wheel");
 }
 
+// Installs com.jblors.rlm.WindowManager (maximizes resizable frames). Call once AWT is up.
+JNIEXPORT void JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jclass clazz) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL) return;
+    jclass wm = (*jenv)->FindClass(jenv, "com/jblors/rlm/WindowManager");
+    if (check_clear(jenv, "WindowManager lookup") || wm == NULL) return;
+    jmethodID install = (*jenv)->GetStaticMethodID(jenv, wm, "install", "()V");
+    if (!check_clear(jenv, "WindowManager.install lookup") && install != NULL) {
+        (*jenv)->CallStaticVoidMethod(jenv, wm, install);
+        check_clear(jenv, "WindowManager.install");
+    }
+    (*jenv)->DeleteLocalRef(jenv, wm);
+}
+
 // CTCClipboard natives. Clipboard sharing with Android comes later; until then
 // the Java clipboard simply stays local to the JVM.
 JNIEXPORT void JNICALL
