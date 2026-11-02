@@ -56,6 +56,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final String MODE_PROBE = "probe";
     static final String MODE_SWING_DEMO = "swing-demo";
     static final String MODE_RUNELITE = "runelite";
+    /** RuneLite client started by our DevLaunch (no launcher) so --developer-mode applies. */
+    static final String MODE_RUNELITE_DEV = "runelite-dev";
 
     /**
      * RuneLite's clientJvm17Arguments from bootstrap.json. In REFLECT mode the launcher runs
@@ -283,8 +285,26 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 : "jagex: Jagex account credentials set for " + c.getProperty("JX_DISPLAY_NAME", "(no display name)"));
     }
 
+    /**
+     * The developer workflow reads ~/.runelite/credentials.properties; put the imported Jagex
+     * credentials there (app-private storage), or remove a stale copy.
+     */
+    private void writeDevCredentialsFile() throws IOException {
+        File f = new File(new File(new File(getFilesDir(), "home"), ".runelite"), "credentials.properties");
+        java.util.Properties c = JagexCredentials.load(this);
+        if (c == null) {
+            f.delete();
+            return;
+        }
+        f.getParentFile().mkdirs();
+        try (java.io.OutputStream out = new java.io.FileOutputStream(f)) {
+            c.store(out, null);
+        }
+        append("jagex: wrote credentials.properties for developer mode");
+    }
+
     private boolean isGraphical() {
-        return MODE_SWING_DEMO.equals(mode) || MODE_RUNELITE.equals(mode);
+        return MODE_SWING_DEMO.equals(mode) || MODE_RUNELITE.equals(mode) || MODE_RUNELITE_DEV.equals(mode);
     }
 
     private static int clamp(int v, int max) {
@@ -441,14 +461,22 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 for (String name : getAssets().list("cacio"))
                     JreInstaller.copyAsset(this, "cacio/" + name, new File(cacio, name));
                 args.addAll(JvmLauncher.cacioArgs(cacio, screenW, screenH));
-                String jarName = MODE_RUNELITE.equals(mode) ? "RuneLite.jar" : "awtdemo.jar";
-                if (MODE_RUNELITE.equals(mode)) {
+                if (MODE_RUNELITE_DEV.equals(mode)) {
                     args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
+                    args.add("-ea"); // RuneLite refuses developer mode without assertions
                     applyJagexCredentials();
+                    writeDevCredentialsFile();
+                    args.add("com.jblors.rlm.DevLaunch"); // on the boot class path (jvmhelper)
+                } else {
+                    String jarName = MODE_RUNELITE.equals(mode) ? "RuneLite.jar" : "awtdemo.jar";
+                    if (MODE_RUNELITE.equals(mode)) {
+                        args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
+                        applyJagexCredentials();
+                    }
+                    File jar = JreInstaller.copyAsset(this, jarName, new File(jars, jarName));
+                    args.add("-jar");
+                    args.add(jar.getAbsolutePath());
                 }
-                File jar = JreInstaller.copyAsset(this, jarName, new File(jars, jarName));
-                args.add("-jar");
-                args.add(jar.getAbsolutePath());
             } else {
                 File probe = JreInstaller.copyAsset(this, "probe.jar", new File(jars, "probe.jar"));
                 args.add("-Djava.awt.headless=true");

@@ -68,6 +68,10 @@ public class MainActivity extends Activity {
         refreshSettings();
 
         LinearLayout tests = new LinearLayout(this);
+        tests.addView(smallButton("Dev mode", 0xFF6D4C41, v -> launch(JvmActivity.MODE_RUNELITE_DEV)),
+                new LinearLayout.LayoutParams(0, dp(52), 1f));
+        View gap1 = new View(this);
+        tests.addView(gap1, new LinearLayout.LayoutParams(dp(12), 1));
         tests.addView(smallButton("Swing demo", 0xFF4A148C, v -> launch(JvmActivity.MODE_SWING_DEMO)),
                 new LinearLayout.LayoutParams(0, dp(52), 1f));
         View gap2 = new View(this);

@@ -25,7 +25,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.4.2-m4-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.5.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -87,8 +87,24 @@ JVM's environment, and the game client reads them.
 The file is a login token, so treat it like a password. The app keeps only the
 `JX_*` keys, in its private storage, and never logs their values.
 
-RuneLite's developer mode cannot be enabled through the launcher: the client turns it
-off whenever a launcher version is set. It is not needed for Jagex accounts.
+## Developer mode
+
+RuneLite turns developer mode off whenever a launcher version is set, and the launcher
+always sets one. **Dev mode** on the main screen therefore skips the launcher and uses
+`com.jblors.rlm.DevLaunch` (in `android/jvmhelper`), which does the launcher's last step
+itself:
+
+- reads `bootstrap.json` and picks this platform's artifacts with the launcher's rules;
+- checks the jars the launcher already downloaded against bootstrap's SHA-256 hashes;
+- starts the client with `--developer-mode` and `-ea`.
+
+Run the normal launch once first so the jars exist. The launcher ships a trimmed
+`runelite-api-*-runtime.jar` without the `gameval` classes the Developer Tools plugin
+needs. DevLaunch therefore downloads the full `runelite-api-*.jar` from repo.runelite.net,
+checks it against the repository's SHA-1, and uses it instead.
+
+DevLaunch does not check the signature on `bootstrap.json`; it relies on HTTPS. Imported
+Jagex credentials are also written to `~/.runelite/credentials.properties` in this mode.
 
 ## Building the APK
 
