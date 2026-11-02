@@ -1,0 +1,6 @@
+// Skip tasks that need hosts outside the sandbox allowlist (docs.oracle.com, checkstyle.org)
+allprojects {
+    tasks.configureEach {
+        if (name == 'javadoc' || name.startsWith('checkstyle')) enabled = false
+    }
+}
