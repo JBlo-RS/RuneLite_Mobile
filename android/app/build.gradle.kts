@@ -14,6 +14,8 @@ val jreTarball: File = (findProperty("rlm.jre") as String?)?.let(::File)
 abstract class StageRuntimeAssets : DefaultTask() {
     @get:InputFile abstract val jre: RegularFileProperty
     @get:InputFile abstract val probeJar: RegularFileProperty
+    @get:InputFile abstract val awtDemoJar: RegularFileProperty
+    @get:InputDirectory abstract val cacioDir: DirectoryProperty
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -27,12 +29,18 @@ abstract class StageRuntimeAssets : DefaultTask() {
         val digest = MessageDigest.getInstance("SHA-256").digest(jreFile.readBytes())
         out.resolve("jre.sha256").writeText(digest.joinToString("") { "%02x".format(it) })
         probeJar.get().asFile.copyTo(out.resolve("probe.jar"))
+        awtDemoJar.get().asFile.copyTo(out.resolve("awtdemo.jar"))
+        cacioDir.get().asFile.listFiles { f -> f.name.endsWith(".jar") }!!.forEach {
+            it.copyTo(out.resolve("cacio/" + it.name))
+        }
     }
 }
 
 val stageRuntimeAssets = tasks.register<StageRuntimeAssets>("stageRuntimeAssets") {
     jre.set(jreTarball)
     probeJar.set(project(":probe").tasks.named<Jar>("jar").flatMap { it.archiveFile })
+    awtDemoJar.set(project(":awtdemo").tasks.named<Jar>("jar").flatMap { it.archiveFile })
+    cacioDir.set(layout.projectDirectory.dir("cacio"))
 }
 
 android {
@@ -44,8 +52,8 @@ android {
         applicationId = "com.jblors.runelitemobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3-m1"
+        versionCode = 5
+        versionName = "0.2.0-m2"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" }
@@ -79,6 +87,16 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.31.6"
+        }
+    }
+
+    packaging {
+        // Extract .so files to nativeLibraryDir: Caciocavallo's CTCScreen needs
+        // libpojavexec_awt.so to exist as a real file there
+        jniLibs {
+            useLegacyPackaging = true
+            // Link-time placeholder for libawt_xawt.so; the JRE ships the real one
+            excludes += "**/libawt_headless.so"
         }
     }
 

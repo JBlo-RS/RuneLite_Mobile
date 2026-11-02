@@ -45,13 +45,15 @@ public class MainActivity extends Activity {
         });
 
         TextView title = new TextView(this);
-        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 1: JVM smoke test");
+        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME + "\nMilestone 2: Swing on screen");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         root.addView(title);
 
+        root.addView(bigButton("▶  Run Swing demo", 0xFF6A1B9A,
+                v -> startActivity(JvmActivity.intent(this, JvmActivity.MODE_SWING_DEMO))));
         root.addView(bigButton("▶  Run JVM probe", 0xFF2E7D32,
-                v -> startActivity(new Intent(this, JvmActivity.class))));
+                v -> startActivity(JvmActivity.intent(this, JvmActivity.MODE_PROBE))));
         root.addView(bigButton("Share log", 0xFF1565C0, v -> shareLog()));
 
         logView = new TextView(this);
@@ -96,7 +98,7 @@ public class MainActivity extends Activity {
 
     private String readLog() {
         File f = JvmActivity.logFile(this);
-        if (!f.isFile()) return "No log yet. Tap the green \"Run JVM probe\" button above.";
+        if (!f.isFile()) return "No log yet. Tap a \"Run\" button above.";
         try {
             return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
         } catch (IOException e) {
