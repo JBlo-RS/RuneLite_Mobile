@@ -17,7 +17,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 | Android SDK (platform 36, build-tools 36.1.0), NDK r27b + r30, CMake 3.31.6 | done |
 | RuneLite builds and tests pass (723 tests, 0 failures) | done |
 | RuneLite client starts on desktop under Xvfb | done |
-| ARM64 Android JRE 17 | building |
+| ARM64 Android JRE 17 (17.0.21, 27 MB `.tar.xz`), built; not yet run on a device | done |
 | Android app (JVM launcher, Cacio surface, input) | not started |
 
 ## Building RuneLite in a restricted sandbox
