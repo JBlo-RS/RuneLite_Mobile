@@ -2,3 +2,7 @@ work/
 *.log
 build/
 .gradle/
+local.properties
+.cxx/
+.externalNativeBuild/
+*.apk

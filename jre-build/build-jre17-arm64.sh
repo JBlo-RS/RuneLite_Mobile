@@ -24,7 +24,10 @@ if command -v apt-get >/dev/null; then
     systemtap-sdt-dev libxtst-dev libasound2-dev libelf-dev libfontconfig1-dev \
     libx11-dev libxext-dev libxrandr-dev libxrender-dev libxt-dev file
 fi
-yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk/27.1.12297006" >/dev/null
+if [ ! -d "$SDK/ndk/27.1.12297006" ]; then
+  # `yes` dies of SIGPIPE when sdkmanager exits; don't let pipefail treat that as failure
+  { yes || :; } | "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk/27.1.12297006" >/dev/null
+fi
 
 # --- sources (git only) -------------------------------------------------------
 cd "$WORK"
@@ -35,6 +38,10 @@ fi
 cd jdkbuild
 # Upstream 1_fix_toolchain.diff no longer applies to current jdk17u; use ours.
 cp "$HERE/patches/jre_17/android/1_fix_toolchain.diff" patches/jre_17/android/
+# Align ELF LOAD segments to 16 KB so the libs load on 16 KB-page kernels
+# (Android 15+ devices); this still works on 4 KB-page devices.
+sed -i 's/^export LDFLAGS=""$/export LDFLAGS="-Wl,-z,max-page-size=16384"/' setdevkitpath.sh
+grep -q 'max-page-size=16384' setdevkitpath.sh
 
 if [ ! -d openjdk-17 ]; then
   git init -q openjdk-17
@@ -45,6 +52,8 @@ fi
 [ -d cups-2.2.4 ]      || git clone -q --depth 1 -b v2.2.4 https://github.com/apple/cups.git cups-2.2.4
 
 # --- build --------------------------------------------------------------------
+# Pojav's scripts test unset variables with [[ -z ]]; nounset breaks them.
+set +u
 . "$HERE/jdkenv.sh"
 # The proxy's JAVA_TOOL_OPTIONS banner confuses configure; the JDK build is offline.
 unset JAVA_TOOL_OPTIONS
