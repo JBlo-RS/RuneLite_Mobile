@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -71,8 +72,9 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             "-Drunelite.launcher.reflect=true",
     };
 
-    /** Height of the virtual AWT screen; width follows the display's aspect ratio. */
-    private static final int SCREEN_HEIGHT = 720;
+    /** Intent extra: height of the virtual AWT screen; width follows the free display area. */
+    static final String EXTRA_SCREEN_HEIGHT = "screenHeight";
+    static final int DEFAULT_SCREEN_HEIGHT = 630;
 
     static File logFile(Context ctx) {
         return new File(ctx.getFilesDir(), "jvm.log");
@@ -158,18 +160,28 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         ui.postDelayed(this::refreshLog, 400);
     }
 
+    /** Width of the control strip on the left edge, in dp. */
+    private static final int STRIP_DP = 60;
+
     private void computeScreenSize() {
         DisplayMetrics m = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getRealMetrics(m);
         int longSide = Math.max(m.widthPixels, m.heightPixels);
         int shortSide = Math.min(m.widthPixels, m.heightPixels);
-        screenH = SCREEN_HEIGHT;
-        screenW = Math.round(SCREEN_HEIGHT * (float) longSide / shortSide) & ~1;
+        int availW = longSide - dp(STRIP_DP);
+        // Smaller virtual height = everything drawn bigger on the phone
+        screenH = getIntent().getIntExtra(EXTRA_SCREEN_HEIGHT, DEFAULT_SCREEN_HEIGHT);
+        screenW = Math.round(screenH * (float) availW / shortSide) & ~1;
     }
 
     private void buildDemoUi() {
-        FrameLayout root = new FrameLayout(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.HORIZONTAL);
         root.setBackgroundColor(Color.BLACK);
+        root.addView(buildControlStrip(), new LinearLayout.LayoutParams(dp(STRIP_DP),
+                LinearLayout.LayoutParams.MATCH_PARENT));
+
+        FrameLayout game = new FrameLayout(this);
         SurfaceView sv = new SurfaceView(this);
         sv.getHolder().addCallback(this);
         TouchInput touch = new TouchInput(getResources().getDisplayMetrics().density,
@@ -186,37 +198,89 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 }, g -> lastGesture = g);
         sv.setOnTouchListener(touch);
         sv.setOnGenericMotionListener(touch);
-        root.addView(sv, new FrameLayout.LayoutParams(
+        game.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-
         keyboard = new KeyboardSink(this, t -> lastGesture = t);
-        root.addView(keyboard, new FrameLayout.LayoutParams(1, 1));
+        game.addView(keyboard, new FrameLayout.LayoutParams(1, 1));
+        root.addView(game, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
-        TextView kb = new TextView(this);
-        kb.setText("⌨");
-        kb.setTextSize(24);
-        kb.setTextColor(Color.WHITE);
-        kb.setGravity(Gravity.CENTER);
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setColor(0x66000000);
-        bg.setCornerRadius(dp(12));
-        kb.setBackground(bg);
-        kb.setOnClickListener(v -> keyboard.toggle());
-        FrameLayout.LayoutParams kblp = new FrameLayout.LayoutParams(dp(52), dp(52),
-                Gravity.BOTTOM | Gravity.END);
-        kblp.setMargins(0, 0, dp(12), dp(12));
-        root.addView(kb, kblp);
-        status = new TextView(this);
-        status.setTextColor(0xFFFFFF00);
-        status.setBackgroundColor(0x80000000);
-        status.setTextSize(12);
-        status.setPadding(12, 6, 12, 6);
-        status.setText("Starting JVM…");
-        root.addView(status, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.START));
         setContentView(root);
         hideSystemBars(root);
+    }
+
+    /** Left-edge controls: keyboard, latching Alt/Shift/Ctrl (like holding them on a PC), Esc. */
+    private View buildControlStrip() {
+        LinearLayout strip = new LinearLayout(this);
+        strip.setOrientation(LinearLayout.VERTICAL);
+        strip.setBackgroundColor(0xFF1A1A1A);
+        strip.setPadding(dp(4), dp(6), dp(4), dp(6));
+
+        strip.addView(stripButton("⌨", false, v -> keyboard.toggle()));
+        strip.addView(modifierButton("Alt", KeyMap.VK_ALT));
+        strip.addView(modifierButton("Shift", KeyMap.VK_SHIFT));
+        strip.addView(modifierButton("Ctrl", KeyMap.VK_CONTROL));
+        strip.addView(stripButton("Esc", false, v -> {
+            AwtBridge.tapKey(KeyMap.VK_ESCAPE);
+            lastGesture = "Esc";
+        }));
+
+        View spacer = new View(this);
+        strip.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
+        status = new TextView(this);
+        status.setTextColor(0xFFAAAAAA);
+        status.setTextSize(9);
+        status.setGravity(Gravity.CENTER);
+        status.setText("starting");
+        strip.addView(status);
+        return strip;
+    }
+
+    private TextView stripButton(String label, boolean small, View.OnClickListener onClick) {
+        TextView b = new TextView(this);
+        b.setText(label);
+        b.setTextSize(label.length() > 3 ? 12 : 16);
+        b.setTextColor(Color.WHITE);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(roundRect(0xFF333333));
+        b.setOnClickListener(onClick);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
+        lp.bottomMargin = dp(6);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** Tap to hold the key down, tap again to release it; lit while held. */
+    private TextView modifierButton(String label, int awtKey) {
+        TextView b = stripButton(label, true, null);
+        boolean[] held = {false};
+        b.setOnClickListener(v -> {
+            held[0] = !held[0];
+            AwtBridge.holdModifier(awtKey, held[0]);
+            b.setBackground(roundRect(held[0] ? 0xFFDC8A00 : 0xFF333333));
+            b.setTextColor(held[0] ? Color.BLACK : Color.WHITE);
+            lastGesture = label + (held[0] ? " held" : " released");
+        });
+        return b;
+    }
+
+    private android.graphics.drawable.GradientDrawable roundRect(int color) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(8));
+        return d;
+    }
+
+    /** Sets JX_* like the Jagex Launcher does (values are never written to the log). */
+    private void applyJagexCredentials() throws android.system.ErrnoException {
+        java.util.Properties c = JagexCredentials.load(this);
+        for (String k : JagexCredentials.KEYS) {
+            String v = c == null ? null : c.getProperty(k);
+            if (v != null) Os.setenv(k, v, true);
+            else Os.unsetenv(k);
+        }
+        append(c == null ? "jagex: no Jagex account imported (normal login)"
+                : "jagex: Jagex account credentials set for " + c.getProperty("JX_DISPLAY_NAME", "(no display name)"));
     }
 
     private boolean isGraphical() {
@@ -329,11 +393,9 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             long now = System.nanoTime();
             if (now - windowStart >= 1_000_000_000L) {
                 float fps = frames * 1e9f / (now - windowStart);
-                String g = lastGesture;
                 setStatus(AwtBridge.isReady()
-                        ? String.format("%dx%d  %.0f fps%s", screenW, screenH, fps,
-                                g.isEmpty() ? "" : "   last input: " + g)
-                        : "Waiting for AWT…");
+                        ? String.format("%.0f fps\n%dx%d", fps, screenW, screenH)
+                        : "waiting");
                 frames = 0;
                 windowStart = now;
             }
@@ -380,7 +442,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                     JreInstaller.copyAsset(this, "cacio/" + name, new File(cacio, name));
                 args.addAll(JvmLauncher.cacioArgs(cacio, screenW, screenH));
                 String jarName = MODE_RUNELITE.equals(mode) ? "RuneLite.jar" : "awtdemo.jar";
-                if (MODE_RUNELITE.equals(mode)) args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
+                if (MODE_RUNELITE.equals(mode)) {
+                    args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
+                    applyJagexCredentials();
+                }
                 File jar = JreInstaller.copyAsset(this, jarName, new File(jars, jarName));
                 args.add("-jar");
                 args.add(jar.getAbsolutePath());

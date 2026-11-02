@@ -25,7 +25,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.4.0-m4-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.4.1-m4-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -48,7 +48,9 @@ Every APK is signed with `android/debug.keystore`, so new builds install over ol
 | One-finger drag | left-button drag |
 | Two-finger drag | middle-button drag (OSRS camera) |
 | Pinch | mouse wheel (zoom) |
-| ⌨ button | soft keyboard; text arrives as `KEY_TYPED`, Backspace/Enter as key presses |
+| ⌨ (left strip) | soft keyboard; text arrives as `KEY_TYPED`, Backspace/Enter as key presses |
+| Alt / Shift / Ctrl (left strip) | tap to hold the key down, tap again to release (lit while held) |
+| Esc (left strip) | Escape |
 | Hardware keyboard / mouse | mapped directly |
 
 Implementation notes:
@@ -57,8 +59,30 @@ Implementation notes:
   `BUTTON1_MASK`=16, `BUTTON2_MASK`=8 and `BUTTON3_MASK`=4. The `*_DOWN_MASK`
   values only work for button 1; for the others they produce events with
   button 0, which crash AWT's `LightweightDispatcher`.
+- A held Alt reaches Java as key events, which the OSRS client and RuneLite hotkeys
+  use. It does not show in `MouseEvent.isAltDown()`, because Cacio does not track Alt
+  in its robot. Forcing the modifier bit makes clicks come out as button 0, because
+  the legacy `ALT_MASK` equals `BUTTON2_MASK`. Shift and Ctrl do show on mouse events.
 - `CTCRobotPeer.mouseWheel` does nothing, so wheel events come from
   `com.jblors.rlm.AndroidInput` (`android/jvmhelper`) on the boot class path.
+
+## Jagex accounts
+
+RuneLite's built-in Jagex login runs a native helper, which Android cannot execute,
+and the helper is not shipped for Linux anyway. Instead, the app does what the Jagex
+Launcher does: it sets `JX_SESSION_ID`, `JX_CHARACTER_ID` and `JX_DISPLAY_NAME` in the
+JVM's environment, and the game client reads them.
+
+1. On a PC, in the Jagex Launcher, add `--insecure-write-credentials` to RuneLite's
+   client arguments, then launch RuneLite once. It writes
+   `credentials.properties` to the `.runelite` folder in your user folder.
+2. Copy that file to the phone. Tap **Jagex account** and pick it.
+
+The file is a login token, so treat it like a password. The app keeps only the
+`JX_*` keys, in its private storage, and never logs their values.
+
+RuneLite's developer mode cannot be enabled through the launcher: the client turns it
+off whenever a launcher version is set. It is not needed for Jagex accounts.
 
 ## Building the APK
 

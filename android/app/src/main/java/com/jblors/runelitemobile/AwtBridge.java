@@ -40,6 +40,18 @@ final class AwtBridge {
     /** Mouse wheel at a screen position; negative rotation = scroll up / zoom in. */
     static native void sendScroll(int x, int y, int rotation);
 
+    /**
+     * Holds or releases a modifier key like a PC keyboard (key press/release events), which is
+     * how the OSRS client and RuneLite's hotkeys track held keys.
+     *
+     * <p>Alt does not show up in MouseEvent.isAltDown(): this Cacio build doesn't track Alt
+     * in its robot's modifier state, and forcing the bit in makes it report clicks as button
+     * 0 (AWT's legacy ALT_MASK equals BUTTON2_MASK). Shift and Ctrl do reach mouse events.
+     */
+    static void holdModifier(int awtKeyCode, boolean down) {
+        key(awtKeyCode, down);
+    }
+
     /** Maximizes resizable Java frames to the virtual screen (see jvmhelper WindowManager). */
     static native void installWindowManager();
 
