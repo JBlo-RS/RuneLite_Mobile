@@ -585,6 +585,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     private void renderLoop() {
         Bitmap frame = Bitmap.createBitmap(screenW, screenH, Bitmap.Config.ARGB_8888);
         Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        Rect bandSrc = new Rect(), bandDst = new Rect();
         Paint shadow = new Paint();
         shadow.setColor(0x99000000);
         int[] awtLayout = null;
@@ -617,8 +618,23 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                     c.drawColor(Color.BLACK);
                     ScreenLayout.Mapping[] maps = screenLayout.mappings();
                     for (int i = 0; i < maps.length; i++) {
-                        if (i > 0) c.drawRect(maps[i].dst.left - dp(6), 0, maps[i].dst.left, ch, shadow);
-                        c.drawBitmap(frame, maps[i].src, maps[i].dst, paint);
+                        ScreenLayout.Mapping m = maps[i];
+                        if (i > 0) {
+                            c.drawRect(m.dst.left - dp(6), 0, m.dst.left, ch, shadow);
+                            // Panel inset for rounded corners: continue the panel's own top and
+                            // bottom pixel rows to the screen edges instead of showing the game
+                            if (m.dst.top > 0) {
+                                bandSrc.set(m.src.left, m.src.top, m.src.right, m.src.top + 1);
+                                bandDst.set(m.dst.left, 0, m.dst.right, m.dst.top);
+                                c.drawBitmap(frame, bandSrc, bandDst, null);
+                            }
+                            if (m.dst.bottom < ch) {
+                                bandSrc.set(m.src.left, m.src.bottom - 1, m.src.right, m.src.bottom);
+                                bandDst.set(m.dst.left, m.dst.bottom, m.dst.right, ch);
+                                c.drawBitmap(frame, bandSrc, bandDst, null);
+                            }
+                        }
+                        c.drawBitmap(frame, m.src, m.dst, paint);
                     }
                     int panelLeft = screenLayout.panelLeft(cw);
                     if (panelLeft != lastPanelLeft) {
