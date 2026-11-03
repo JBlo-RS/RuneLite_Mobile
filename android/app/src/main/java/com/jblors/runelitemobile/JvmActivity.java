@@ -621,15 +621,15 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                         ScreenLayout.Mapping m = maps[i];
                         if (i > 0) {
                             c.drawRect(m.dst.left - dp(6), 0, m.dst.left, ch, shadow);
-                            // Panel inset for rounded corners: continue the panel's own top and
-                            // bottom pixel rows to the screen edges instead of showing the game
+                            // Panel inset for rounded corners: fill the gaps above and below with
+                            // the panel's top pixel row, stretched. The top row is the sidebar's
+                            // plain background; the bottom row can be scrolling list content.
+                            bandSrc.set(m.src.left, m.src.top, m.src.right, m.src.top + 1);
                             if (m.dst.top > 0) {
-                                bandSrc.set(m.src.left, m.src.top, m.src.right, m.src.top + 1);
                                 bandDst.set(m.dst.left, 0, m.dst.right, m.dst.top);
                                 c.drawBitmap(frame, bandSrc, bandDst, null);
                             }
                             if (m.dst.bottom < ch) {
-                                bandSrc.set(m.src.left, m.src.bottom - 1, m.src.right, m.src.bottom);
                                 bandDst.set(m.dst.left, m.dst.bottom, m.dst.right, ch);
                                 c.drawBitmap(frame, bandSrc, bandDst, null);
                             }

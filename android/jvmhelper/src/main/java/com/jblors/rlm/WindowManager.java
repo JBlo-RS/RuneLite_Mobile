@@ -53,8 +53,11 @@ public final class WindowManager {
         EventQueue.invokeLater(() -> {
             Toolkit.getDefaultToolkit().addAWTEventListener(WindowManager::onEvent,
                     AWTEvent.WINDOW_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.COMPONENT_EVENT_MASK);
+            // Windows already open when installed (the launcher splash usually is)
             for (Window w : Window.getWindows()) {
-                if (w instanceof Frame && w.isShowing()) fill((Frame) w);
+                if (!(w instanceof Frame) || !w.isShowing()) continue;
+                if (maximizable((Frame) w)) fill((Frame) w);
+                else center(w);
             }
             new javax.swing.Timer(500, e -> {
                 for (Window w : Window.getWindows()) {
@@ -75,7 +78,8 @@ public final class WindowManager {
                     log("opened", w);
                     // Let the app finish its own sizing/positioning first
                     EventQueue.invokeLater(() -> {
-                        if (w instanceof Frame) fill((Frame) w);
+                        if (w instanceof Frame && maximizable((Frame) w)) fill((Frame) w);
+                        else if (w instanceof Frame) center(w); // e.g. the launcher/client splash
                         else keepOnScreen(w);
                         w.toFront();
                         w.requestFocus();
@@ -125,6 +129,17 @@ public final class WindowManager {
         }
     }
 
+    /** Centre a window on the virtual screen. */
+    private static void center(Window w) {
+        if (!w.isShowing()) return;
+        Rectangle screen = w.getGraphicsConfiguration().getBounds();
+        int x = screen.x + (screen.width - w.getWidth()) / 2, y = screen.y + (screen.height - w.getHeight()) / 2;
+        if (x != w.getX() || y != w.getY()) {
+            w.setLocation(Math.max(screen.x, x), Math.max(screen.y, y));
+            log("centred", w);
+        }
+    }
+
     /** Move a (non-maximized) window so it is entirely on the virtual screen. */
     private static void keepOnScreen(Window w) {
         if (!w.isShowing()) return;
@@ -145,8 +160,17 @@ public final class WindowManager {
                 + w.getBounds().x + "," + w.getBounds().y + " " + w.getWidth() + "x" + w.getHeight());
     }
 
+    /**
+     * Frames to fill the screen: resizable ones, except splash screens. RuneLite's launcher and
+     * client splash screens (net.runelite.*.SplashScreen) are resizable 200x274 frames;
+     * maximizing them leaves their content in a corner of a full-screen window.
+     */
+    private static boolean maximizable(Frame f) {
+        return f.isResizable() && !f.getClass().getSimpleName().endsWith("SplashScreen");
+    }
+
     private static void fill(Frame f) {
-        if (!f.isResizable() || !f.isShowing()) return;
+        if (!maximizable(f) || !f.isShowing()) return;
         Rectangle screen = screenOf(f);
         if (!isMaximized(f)) {
             f.setExtendedState(f.getExtendedState() | Frame.MAXIMIZED_BOTH);
