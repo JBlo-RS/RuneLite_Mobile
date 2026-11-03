@@ -77,6 +77,12 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     /** Intent extra: height of the virtual AWT screen; width follows the free display area. */
     static final String EXTRA_SCREEN_HEIGHT = "screenHeight";
     static final int DEFAULT_SCREEN_HEIGHT = 630;
+    /** Intent extra: true = mobile layout (full-screen game, slide-in sidebar). */
+    static final String EXTRA_MOBILE_LAYOUT = "mobileLayout";
+
+    /** RuneLite's sidebar incl. its icon strip, and its title bar, in virtual px (measured). */
+    private static final int RUNELITE_SIDEBAR_W = 274;
+    private static final int RUNELITE_TITLE_H = 26;
 
     static File logFile(Context ctx) {
         return new File(ctx.getFilesDir(), "jvm.log");
@@ -99,8 +105,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     private volatile SurfaceHolder surface;
     private volatile boolean rendering;
     private int screenW, screenH;
-    // Where the virtual screen is drawn inside the SurfaceView (set by the render loop)
-    private volatile int dstL, dstT, dstW = 1, dstH = 1;
+    private ScreenLayout screenLayout;
+    private View panelHandle;
     private volatile String lastGesture = "";
     private KeyboardSink keyboard;
 
@@ -170,44 +176,127 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         getWindowManager().getDefaultDisplay().getRealMetrics(m);
         int longSide = Math.max(m.widthPixels, m.heightPixels);
         int shortSide = Math.min(m.widthPixels, m.heightPixels);
-        int availW = longSide - dp(STRIP_DP);
+        boolean mobile = getIntent().getBooleanExtra(EXTRA_MOBILE_LAYOUT, true);
+        screenLayout = new ScreenLayout(mobile);
         // Smaller virtual height = everything drawn bigger on the phone
         screenH = getIntent().getIntExtra(EXTRA_SCREEN_HEIGHT, DEFAULT_SCREEN_HEIGHT);
-        screenW = Math.round(screenH * (float) availW / shortSide) & ~1;
+        if (mobile) {
+            // The game canvas fills the phone, so give it the phone's shape and leave room for
+            // RuneLite's title bar and sidebar, which stay off screen until the panel opens
+            int gameH = screenH - RUNELITE_TITLE_H;
+            screenW = (Math.round(gameH * (float) longSide / shortSide) + RUNELITE_SIDEBAR_W) & ~1;
+        } else {
+            int availW = longSide - dp(STRIP_DP);
+            screenW = Math.round(screenH * (float) availW / shortSide) & ~1;
+        }
     }
 
     private void buildDemoUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.HORIZONTAL);
         root.setBackgroundColor(Color.BLACK);
-        root.addView(buildControlStrip(), new LinearLayout.LayoutParams(dp(STRIP_DP),
-                LinearLayout.LayoutParams.MATCH_PARENT));
+        if (!screenLayout.isMobile()) {
+            root.addView(buildControlStrip(), new LinearLayout.LayoutParams(dp(STRIP_DP),
+                    LinearLayout.LayoutParams.MATCH_PARENT));
+        }
 
         FrameLayout game = new FrameLayout(this);
         SurfaceView sv = new SurfaceView(this);
         sv.getHolder().addCallback(this);
         TouchInput touch = new TouchInput(getResources().getDisplayMetrics().density,
-                new TouchInput.Mapper() {
-                    @Override
-                    public int toScreenX(float x) {
-                        return clamp(Math.round((x - dstL) * screenW / (float) dstW), screenW);
-                    }
-
-                    @Override
-                    public int toScreenY(float y) {
-                        return clamp(Math.round((y - dstT) * screenH / (float) dstH), screenH);
-                    }
-                }, g -> lastGesture = g);
+                (x, y) -> screenLayout.toScreen(x, y), g -> lastGesture = g);
         sv.setOnTouchListener(touch);
         sv.setOnGenericMotionListener(touch);
         game.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         keyboard = new KeyboardSink(this, t -> lastGesture = t);
         game.addView(keyboard, new FrameLayout.LayoutParams(1, 1));
+        if (screenLayout.isMobile()) addFloatingControls(game);
         root.addView(game, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         setContentView(root);
         hideSystemBars(root);
+    }
+
+    /** Mobile layout: small translucent buttons over the game, and the sidebar's drawer tab. */
+    private void addFloatingControls(FrameLayout game) {
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.addView(floatingButton(stripButton("⌨", false, v -> keyboard.toggle())));
+        column.addView(floatingButton(modifierButton("Alt", KeyMap.VK_ALT)));
+        column.addView(floatingButton(modifierButton("Shift", KeyMap.VK_SHIFT)));
+        column.addView(floatingButton(modifierButton("Ctrl", KeyMap.VK_CONTROL)));
+        column.addView(floatingButton(stripButton("Esc", false, v -> {
+            AwtBridge.tapKey(KeyMap.VK_ESCAPE);
+            lastGesture = "Esc";
+        })));
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.START | Gravity.CENTER_VERTICAL);
+        clp.leftMargin = dp(8);
+        game.addView(column, clp);
+
+        // Drawer tab on the right edge: slides RuneLite's sidebar in and out
+        TextView tab = new TextView(this);
+        tab.setText("◀");
+        tab.setTextSize(16);
+        tab.setTextColor(Color.WHITE);
+        tab.setGravity(Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xAA1E1E1E);
+        bg.setStroke(dp(1), 0x66DC8A00);
+        float r = dp(12);
+        bg.setCornerRadii(new float[]{r, r, 0, 0, 0, 0, r, r});
+        tab.setBackground(bg);
+        tab.setOnClickListener(v -> togglePanel());
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(dp(30), dp(76),
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        game.addView(tab, tlp);
+        panelHandle = tab;
+    }
+
+    /** Wraps a strip button for the floating column: smaller, translucent. */
+    private View floatingButton(TextView b) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(48), dp(40));
+        lp.bottomMargin = dp(6);
+        b.setLayoutParams(lp);
+        b.setAlpha(0.8f);
+        if (b.getTag() == null) b.setBackground(roundRect(0x99222222));
+        return b;
+    }
+
+    private void togglePanel() {
+        boolean open = !screenLayout.isPanelOpen();
+        // RuneLite's own sidebar must be open for there to be anything to show
+        if (open && screenLayout.panelSourceWidth() > 0
+                && screenLayout.panelSourceWidth() < ScreenLayout.MIN_PANEL_WIDTH) {
+            openRuneLiteSidebar();
+        }
+        screenLayout.setPanelOpen(open);
+        if (panelHandle instanceof TextView) ((TextView) panelHandle).setText(open ? "▶" : "◀");
+        lastGesture = open ? "panel opened" : "panel closed";
+    }
+
+    /** RuneLite's default sidebar toggle hotkey, Ctrl+F11. */
+    private void openRuneLiteSidebar() {
+        AwtBridge.key(KeyMap.VK_CONTROL, true);
+        AwtBridge.tapKey(KeyMap.VK_F1 + 10);
+        AwtBridge.key(KeyMap.VK_CONTROL, false);
+    }
+
+    /** Moves the drawer tab along with the panel's left edge (UI thread). */
+    private void placePanelHandle(int panelLeft, int surfaceW) {
+        if (panelHandle == null) return;
+        panelHandle.setTranslationX(panelLeft - surfaceW);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (screenLayout != null && screenLayout.isPanelOpen()) {
+            togglePanel();
+            return;
+        }
+        super.onBackPressed();
     }
 
     /** Left-edge controls: keyboard, latching Alt/Shift/Ctrl (like holding them on a PC), Esc. */
@@ -370,7 +459,11 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     private void renderLoop() {
         Bitmap frame = Bitmap.createBitmap(screenW, screenH, Bitmap.Config.ARGB_8888);
         Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
-        Rect dst = new Rect();
+        Paint shadow = new Paint();
+        shadow.setColor(0x99000000);
+        int[] awtLayout = null;
+        long lastLayoutQuery = 0, lastFrame = System.nanoTime();
+        int lastPanelLeft = Integer.MIN_VALUE;
         long windowStart = System.nanoTime();
         int frames = 0;
         boolean announced = false;
@@ -388,16 +481,24 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 try {
                     c = holder.getSurface().lockHardwareCanvas();
                     int cw = c.getWidth(), ch = c.getHeight();
-                    // Fit the virtual screen to the surface, preserving aspect ratio
-                    float scale = Math.min(cw / (float) screenW, ch / (float) screenH);
-                    int w = Math.round(screenW * scale), h = Math.round(screenH * scale);
-                    dst.set((cw - w) / 2, (ch - h) / 2, (cw - w) / 2 + w, (ch - h) / 2 + h);
-                    dstL = dst.left;
-                    dstT = dst.top;
-                    dstW = Math.max(1, w);
-                    dstH = Math.max(1, h);
+                    long nowNs = System.nanoTime();
+                    if (screenLayout.isMobile() && nowNs - lastLayoutQuery > 250_000_000L) {
+                        awtLayout = AwtBridge.layout(); // where the game canvas is right now
+                        lastLayoutQuery = nowNs;
+                    }
+                    screenLayout.update(cw, ch, screenW, screenH, awtLayout, (nowNs - lastFrame) / 1e9f);
+                    lastFrame = nowNs;
                     c.drawColor(Color.BLACK);
-                    c.drawBitmap(frame, null, dst, paint);
+                    ScreenLayout.Mapping[] maps = screenLayout.mappings();
+                    for (int i = 0; i < maps.length; i++) {
+                        if (i > 0) c.drawRect(maps[i].dst.left - dp(6), 0, maps[i].dst.left, ch, shadow);
+                        c.drawBitmap(frame, maps[i].src, maps[i].dst, paint);
+                    }
+                    int panelLeft = screenLayout.panelLeft(cw);
+                    if (panelLeft != lastPanelLeft) {
+                        lastPanelLeft = panelLeft;
+                        ui.post(() -> placePanelHandle(panelLeft, cw));
+                    }
                 } catch (RuntimeException e) {
                     // Surface went away mid-frame
                 } finally {

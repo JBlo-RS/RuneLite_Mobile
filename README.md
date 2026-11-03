@@ -25,7 +25,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.5.2-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.6.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -75,8 +75,22 @@ Implementation notes:
   RuneLite's colour picker). `com.jblors.rlm.ScreenCompositor` redraws each dialog and
   popup from its own Swing root pane about 30 times a second and draws them on top of the
   frame sent to Android. Input already follows Cacio's real window order.
+- The same stale clip let game frames wipe Swing UI next to the canvas after the layout
+  changed (sidebar icons disappearing until touched). `ScreenCompositor` also keeps a UI
+  layer for the main window: its Swing content is re-printed when Swing repaints, at most
+  10 times a second, and drawn everywhere except the game canvas's current area.
 - `CTCRobotPeer.mouseWheel` does nothing, so wheel events come from
   `com.jblors.rlm.AndroidInput` (`android/jvmhelper`) on the boot class path.
+
+## Layouts
+
+- **Mobile** (default): the game canvas fills the phone screen. The ◀ tab on the right
+  edge slides RuneLite's sidebar in as an overlay (and opens it with Ctrl+F11 if it is
+  closed). Keyboard, Alt/Shift/Ctrl and Esc are small floating buttons on the left. Back
+  closes the panel. The virtual screen is sized so the canvas has the phone's aspect ratio;
+  set the game to Resizable mode so the canvas fills it. `ScreenCompositor.layout()`
+  reports where the canvas is.
+- **Classic**: the whole RuneLite window, fitted beside a fixed control strip.
 
 ## Jagex accounts
 

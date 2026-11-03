@@ -178,6 +178,28 @@ Java_com_jblors_runelitemobile_AwtBridge_sendScroll(JNIEnv *aenv, jclass clazz, 
     check_clear(jenv, "wheel");
 }
 
+// ScreenCompositor.layout(): {canvasX, canvasY, canvasW, canvasH, winX, winY, winW, winH} or null
+static jmethodID m_layout;
+JNIEXPORT jintArray JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_layout(JNIEnv *aenv, jclass clazz) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL || cls_screen == NULL) return NULL; // cls_screen is set by renderFrame
+    if (m_layout == NULL) {
+        m_layout = (*jenv)->GetStaticMethodID(jenv, cls_screen, "layout", "()[I");
+        if (check_clear(jenv, "layout lookup") || m_layout == NULL) return NULL;
+    }
+    jintArray src = (jintArray) (*jenv)->CallStaticObjectMethod(jenv, cls_screen, m_layout);
+    if (clear_quiet(jenv) || src == NULL) return NULL;
+    jint buf[8];
+    jsize n = (*jenv)->GetArrayLength(jenv, src);
+    if (n > 8) n = 8;
+    (*jenv)->GetIntArrayRegion(jenv, src, 0, n, buf);
+    (*jenv)->DeleteLocalRef(jenv, src);
+    jintArray out = (*aenv)->NewIntArray(aenv, n);
+    if (out != NULL) (*aenv)->SetIntArrayRegion(aenv, out, 0, n, buf);
+    return out;
+}
+
 // Installs com.jblors.rlm.WindowManager (maximizes resizable frames). Call once AWT is up.
 JNIEXPORT void JNICALL
 Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jclass clazz) {

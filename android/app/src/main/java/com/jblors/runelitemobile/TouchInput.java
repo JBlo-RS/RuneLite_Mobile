@@ -20,9 +20,8 @@ import android.view.View;
 final class TouchInput implements View.OnTouchListener, View.OnGenericMotionListener {
     /** Maps view coordinates to the virtual AWT screen. */
     interface Mapper {
-        int toScreenX(float viewX);
-
-        int toScreenY(float viewY);
+        /** Virtual-screen point {x, y} for a view point, or null if it maps nowhere. */
+        int[] toScreen(float viewX, float viewY);
     }
 
     interface Listener {
@@ -67,7 +66,7 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
                 downX = e.getX();
                 downY = e.getY();
                 dragging = longPressed = multi = rotating = false;
-                AwtBridge.mouseMove(sx(downX), sy(downY));
+                move(downX, downY);
                 handler.postDelayed(longPress, LONG_PRESS_MS);
                 return true;
 
@@ -84,11 +83,11 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
                 if (!dragging && Math.hypot(e.getX() - downX, e.getY() - downY) > slop) {
                     handler.removeCallbacks(longPress);
                     dragging = true;
-                    AwtBridge.mouseMove(sx(downX), sy(downY));
+                    move(downX, downY);
                     AwtBridge.mouseButton(AwtBridge.BUTTON_LEFT, true);
                     listener.onGesture("drag start");
                 }
-                if (dragging) AwtBridge.mouseMove(sx(e.getX()), sy(e.getY()));
+                if (dragging) move(e.getX(), e.getY());
                 return true;
 
             case MotionEvent.ACTION_POINTER_UP:
@@ -100,11 +99,11 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
                 if (multi) {
                     endMulti();
                 } else if (dragging) {
-                    AwtBridge.mouseMove(sx(e.getX()), sy(e.getY()));
+                    move(e.getX(), e.getY());
                     AwtBridge.mouseButton(AwtBridge.BUTTON_LEFT, false);
                     listener.onGesture("drag end");
                 } else if (!longPressed) {
-                    AwtBridge.click(sx(downX), sy(downY), AwtBridge.BUTTON_LEFT);
+                    click(downX, downY, AwtBridge.BUTTON_LEFT);
                     listener.onGesture("tap");
                 }
                 multi = false;
@@ -123,7 +122,7 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
     private void fireLongPress() {
         if (dragging || multi) return;
         longPressed = true;
-        AwtBridge.click(sx(downX), sy(downY), AwtBridge.BUTTON_RIGHT);
+        click(downX, downY, AwtBridge.BUTTON_RIGHT);
         if (view != null) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
         listener.onGesture("long press (right click)");
     }
@@ -148,7 +147,7 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
         // Pinch -> wheel: one click per pinchStep of span change. Spreading = zoom in = negative.
         int steps = (int) ((s - lastSpanStep) / pinchStep);
         if (steps != 0) {
-            AwtBridge.wheel(sx(cx), sy(cy), -steps);
+            wheel(cx, cy, -steps);
             lastSpanStep += steps * pinchStep;
             listener.onGesture("pinch (wheel " + (-steps) + ")");
         }
@@ -157,11 +156,11 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
         boolean pinching = Math.abs(s - startSpan) > Math.hypot(cx - startCx, cy - startCy);
         if (!rotating && !pinching && Math.hypot(cx - startCx, cy - startCy) > slop) {
             rotating = true;
-            AwtBridge.mouseMove(sx(startCx), sy(startCy));
+            move(startCx, startCy);
             AwtBridge.mouseButton(AwtBridge.BUTTON_MIDDLE, true);
             listener.onGesture("two-finger drag (middle button)");
         }
-        if (rotating && (cx != lastCx || cy != lastCy)) AwtBridge.mouseMove(sx(cx), sy(cy));
+        if (rotating && (cx != lastCx || cy != lastCy)) move(cx, cy);
         lastCx = cx;
         lastCy = cy;
     }
@@ -182,7 +181,7 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
     // ------------------------------------------------------------ physical mouse
 
     private boolean onMouse(MotionEvent e) {
-        AwtBridge.mouseMove(sx(e.getX()), sy(e.getY()));
+        move(e.getX(), e.getY());
         int now = e.getButtonState();
         updateButton(now, MotionEvent.BUTTON_PRIMARY, AwtBridge.BUTTON_LEFT);
         updateButton(now, MotionEvent.BUTTON_SECONDARY, AwtBridge.BUTTON_RIGHT);
@@ -201,11 +200,11 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
         if (!e.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) return false;
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_HOVER_MOVE:
-                AwtBridge.mouseMove(sx(e.getX()), sy(e.getY()));
+                move(e.getX(), e.getY());
                 return true;
             case MotionEvent.ACTION_SCROLL:
                 float vs = e.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                AwtBridge.wheel(sx(e.getX()), sy(e.getY()), vs > 0 ? -1 : vs < 0 ? 1 : 0);
+                wheel(e.getX(), e.getY(), vs > 0 ? -1 : vs < 0 ? 1 : 0);
                 return true;
             case MotionEvent.ACTION_BUTTON_PRESS:
             case MotionEvent.ACTION_BUTTON_RELEASE:
@@ -214,11 +213,18 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
         return false;
     }
 
-    private int sx(float x) {
-        return map.toScreenX(x);
+    private void move(float x, float y) {
+        int[] p = map.toScreen(x, y);
+        if (p != null) AwtBridge.mouseMove(p[0], p[1]);
     }
 
-    private int sy(float y) {
-        return map.toScreenY(y);
+    private void click(float x, float y, int button) {
+        int[] p = map.toScreen(x, y);
+        if (p != null) AwtBridge.click(p[0], p[1], button);
+    }
+
+    private void wheel(float x, float y, int rotation) {
+        int[] p = map.toScreen(x, y);
+        if (p != null) AwtBridge.wheel(p[0], p[1], rotation);
     }
 }

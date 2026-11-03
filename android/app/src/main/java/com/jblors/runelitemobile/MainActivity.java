@@ -1,107 +1,209 @@
 package com.jblors.runelitemobile;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
-import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Properties;
 
-/** Main process: launch the JVM probe, then show and share its log. */
+/** Launch screen: play, account, settings, and the developer/test tools under "More". */
 public class MainActivity extends Activity {
     private static final int REQ_IMPORT_CREDENTIALS = 1;
     private static final int[] UI_SIZES = {720, 630, 540};
     private static final String[] UI_SIZE_NAMES = {"Small", "Medium", "Large"};
 
-    private TextView logView;
-    private Button uiSizeButton, jagexButton;
+    // RuneLite-ish palette
+    private static final int BG = 0xFF171717;
+    private static final int CARD = 0xFF232323;
+    private static final int CARD_LINE = 0xFF2E2E2E;
+    private static final int ORANGE = 0xFFDC8A00;
+    private static final int TEXT = 0xFFE6E6E6;
+    private static final int MUTED = 0xFF8C8C8C;
+
+    private TextView accountName, accountHint, accountAction;
+    private LinearLayout layoutChoice, sizeChoice, more;
+    private TextView moreToggle;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF121212);
-        // targetSdk 35 is edge-to-edge on Android 15+: keep content clear of the status,
-        // navigation and cutout areas.
-        final int pad = dp(16);
-        root.setOnApplyWindowInsetsListener((v, insets) -> {
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(20), dp(20), dp(20), dp(24));
+
+        col.addView(header());
+        col.addView(playButton(), marginTop(dp(24)));
+        col.addView(accountCard(), marginTop(dp(16)));
+        col.addView(settingsCard(), marginTop(dp(12)));
+        col.addView(moreCard(), marginTop(dp(12)));
+
+        TextView footer = text("Unofficial port. Not affiliated with RuneLite or Jagex.", 12, MUTED);
+        footer.setGravity(Gravity.CENTER);
+        col.addView(footer, marginTop(dp(20)));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(BG);
+        scroll.setFillViewport(true);
+        scroll.addView(col);
+        // targetSdk 35 is edge-to-edge on Android 15+: keep content clear of the system bars
+        scroll.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
                 Insets b = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-                v.setPadding(b.left + pad, b.top + pad, b.right + pad, b.bottom + pad);
+                v.setPadding(b.left, b.top, b.right, b.bottom);
                 return WindowInsets.CONSUMED;
             }
-            v.setPadding(insets.getSystemWindowInsetLeft() + pad, insets.getSystemWindowInsetTop() + pad,
-                    insets.getSystemWindowInsetRight() + pad, insets.getSystemWindowInsetBottom() + pad);
+            v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-
-        TextView title = new TextView(this);
-        title.setText("RuneLite Mobile " + BuildConfig.VERSION_NAME);
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(18);
-        root.addView(title);
-
-        root.addView(bigButton("▶  Launch RuneLite", 0xFFB35C00, v -> launch(JvmActivity.MODE_RUNELITE)));
-
-        LinearLayout settings = new LinearLayout(this);
-        uiSizeButton = bigButton("", 0xFF37474F, v -> cycleUiSize());
-        jagexButton = bigButton("", 0xFF37474F, v -> onJagexButton());
-        settings.addView(uiSizeButton, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        View gap = new View(this);
-        settings.addView(gap, new LinearLayout.LayoutParams(dp(12), 1));
-        settings.addView(jagexButton, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        root.addView(settings);
-        refreshSettings();
-
-        LinearLayout tests = new LinearLayout(this);
-        tests.addView(smallButton("Dev mode", 0xFF6D4C41, v -> launch(JvmActivity.MODE_RUNELITE_DEV)),
-                new LinearLayout.LayoutParams(0, dp(52), 1f));
-        View gap1 = new View(this);
-        tests.addView(gap1, new LinearLayout.LayoutParams(dp(12), 1));
-        tests.addView(smallButton("Swing demo", 0xFF4A148C, v -> launch(JvmActivity.MODE_SWING_DEMO)),
-                new LinearLayout.LayoutParams(0, dp(52), 1f));
-        View gap2 = new View(this);
-        tests.addView(gap2, new LinearLayout.LayoutParams(dp(12), 1));
-        tests.addView(smallButton("JVM probe", 0xFF1B5E20, v -> launch(JvmActivity.MODE_PROBE)),
-                new LinearLayout.LayoutParams(0, dp(52), 1f));
-        View gap3 = new View(this);
-        tests.addView(gap3, new LinearLayout.LayoutParams(dp(12), 1));
-        tests.addView(smallButton("Share log", 0xFF0D47A1, v -> shareLog()),
-                new LinearLayout.LayoutParams(0, dp(52), 1f));
-        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tlp.topMargin = dp(12);
-        root.addView(tests, tlp);
-
-        logView = new TextView(this);
-        logView.setTypeface(Typeface.MONOSPACE);
-        logView.setTextColor(0xFFE0E0E0);
-        logView.setTextSize(11);
-        logView.setTextIsSelectable(true);
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(logView);
-        root.addView(scroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        setContentView(root);
+        setContentView(scroll);
+        refresh();
     }
 
-    // ------------------------------------------------------------ settings
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refresh();
+    }
 
-    private android.content.SharedPreferences prefs() {
+    // ------------------------------------------------------------ sections
+
+    private View header() {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.runelite_logo);
+        row.addView(logo, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.setPadding(dp(14), 0, 0, 0);
+        TextView name = text("RuneLite", 28, Color.WHITE);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        titles.addView(name);
+        TextView sub = text("Mobile  ·  " + BuildConfig.VERSION_NAME, 14, ORANGE);
+        titles.addView(sub);
+        row.addView(titles);
+        return row;
+    }
+
+    private View playButton() {
+        TextView play = text("▶   Play", 22, 0xFF111111);
+        play.setTypeface(Typeface.DEFAULT_BOLD);
+        play.setGravity(Gravity.CENTER);
+        play.setBackground(round(ORANGE, dp(16), 0));
+        play.setOnClickListener(v -> launch(JvmActivity.MODE_RUNELITE));
+        play.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(72)));
+        play.setElevation(dp(4));
+        return play;
+    }
+
+    private View accountCard() {
+        LinearLayout card = card();
+        card.addView(label("ACCOUNT"));
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        accountName = text("", 17, TEXT);
+        accountHint = text("", 13, MUTED);
+        texts.addView(accountName);
+        texts.addView(accountHint);
+        row.addView(texts, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        accountAction = chip("", false);
+        accountAction.setOnClickListener(v -> onAccountAction());
+        row.addView(accountAction);
+        card.addView(row, marginTop(dp(8)));
+        return card;
+    }
+
+    private View settingsCard() {
+        LinearLayout card = card();
+        card.addView(label("LAYOUT"));
+        layoutChoice = segmented(new String[]{"Mobile", "Classic"}, i -> {
+            prefs().edit().putBoolean("mobileLayout", i == 0).apply();
+            refresh();
+        });
+        card.addView(layoutChoice, marginTop(dp(8)));
+        TextView layoutHint = text("Mobile: the game fills the screen and the ◀ tab slides in the "
+                + "RuneLite sidebar. Works best with the game set to Resizable mode.", 12, MUTED);
+        card.addView(layoutHint, marginTop(dp(6)));
+
+        card.addView(label("UI SIZE"), marginTop(dp(16)));
+        sizeChoice = segmented(UI_SIZE_NAMES, i -> {
+            prefs().edit().putInt("screenHeight", UI_SIZES[i]).apply();
+            refresh();
+        });
+        card.addView(sizeChoice, marginTop(dp(8)));
+        return card;
+    }
+
+    private View moreCard() {
+        LinearLayout card = card();
+        moreToggle = text("More  ▾", 15, TEXT);
+        moreToggle.setPadding(0, dp(2), 0, dp(2));
+        moreToggle.setOnClickListener(v -> {
+            boolean show = more.getVisibility() != View.VISIBLE;
+            more.setVisibility(show ? View.VISIBLE : View.GONE);
+            moreToggle.setText(show ? "More  ▴" : "More  ▾");
+        });
+        card.addView(moreToggle);
+
+        more = new LinearLayout(this);
+        more.setOrientation(LinearLayout.VERTICAL);
+        more.setVisibility(View.GONE);
+        more.addView(moreItem("Developer mode", "Start the client without the launcher, with --developer-mode",
+                v -> launch(JvmActivity.MODE_RUNELITE_DEV)));
+        more.addView(moreItem("View log", "Output of the last run", v -> showLog()));
+        more.addView(moreItem("Share log", "Send the last run's log", v -> shareLog()));
+        more.addView(moreItem("Swing demo", "Test touch, keyboard and drawing", v -> launch(JvmActivity.MODE_SWING_DEMO)));
+        more.addView(moreItem("JVM probe", "Test the Java runtime", v -> launch(JvmActivity.MODE_PROBE)));
+        card.addView(more);
+        return card;
+    }
+
+    private View moreItem(String title, String hint, View.OnClickListener onClick) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setPadding(0, dp(12), 0, dp(12));
+        item.addView(text(title, 16, TEXT));
+        item.addView(text(hint, 12, MUTED));
+        item.setOnClickListener(onClick);
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        View line = new View(this);
+        line.setBackgroundColor(CARD_LINE);
+        wrap.addView(line, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+        wrap.addView(item);
+        return wrap;
+    }
+
+    // ------------------------------------------------------------ state
+
+    private SharedPreferences prefs() {
         return getSharedPreferences("settings", MODE_PRIVATE);
     }
 
@@ -111,30 +213,36 @@ public class MainActivity extends Activity {
         return 1;
     }
 
-    private void cycleUiSize() {
-        int next = (uiSizeIndex() + 1) % UI_SIZES.length;
-        prefs().edit().putInt("screenHeight", UI_SIZES[next]).apply();
-        refreshSettings();
+    private boolean mobileLayout() {
+        return prefs().getBoolean("mobileLayout", true);
+    }
+
+    private void refresh() {
+        if (layoutChoice == null) return;
+        select(layoutChoice, mobileLayout() ? 0 : 1);
+        select(sizeChoice, uiSizeIndex());
+        Properties creds = JagexCredentials.load(this);
+        if (creds == null) {
+            accountName.setText("No Jagex account");
+            accountHint.setText("Log in with username and password in the game");
+            accountAction.setText("Import");
+        } else {
+            accountName.setText(creds.getProperty("JX_DISPLAY_NAME", "Jagex account"));
+            accountHint.setText("Jagex account, logs in automatically");
+            accountAction.setText("Remove");
+        }
     }
 
     private void launch(String mode) {
         startActivity(JvmActivity.intent(this, mode)
-                .putExtra(JvmActivity.EXTRA_SCREEN_HEIGHT, UI_SIZES[uiSizeIndex()]));
+                .putExtra(JvmActivity.EXTRA_SCREEN_HEIGHT, UI_SIZES[uiSizeIndex()])
+                .putExtra(JvmActivity.EXTRA_MOBILE_LAYOUT, mobileLayout()));
     }
 
-    private void refreshSettings() {
-        int i = uiSizeIndex();
-        uiSizeButton.setText("UI size: " + UI_SIZE_NAMES[i] + "\n(" + UI_SIZES[i] + "p)");
-        uiSizeButton.setTextSize(15);
-        java.util.Properties creds = JagexCredentials.load(this);
-        jagexButton.setText(creds == null ? "Jagex account:\nimport…"
-                : "Jagex account:\n" + creds.getProperty("JX_DISPLAY_NAME", "(imported)"));
-        jagexButton.setTextSize(15);
-    }
-
-    private void onJagexButton() {
-        if (JagexCredentials.load(this) == null) {
-            new android.app.AlertDialog.Builder(this)
+    private void onAccountAction() {
+        Properties creds = JagexCredentials.load(this);
+        if (creds == null) {
+            new AlertDialog.Builder(this)
                     .setTitle("Import Jagex account")
                     .setMessage("Pick the credentials.properties file RuneLite wrote on your PC.\n\n"
                             + "On the PC: in the Jagex Launcher, open RuneLite's settings and add the "
@@ -150,14 +258,14 @@ public class MainActivity extends Activity {
                     .setNegativeButton("Cancel", null)
                     .show();
         } else {
-            new android.app.AlertDialog.Builder(this)
-                    .setTitle("Jagex account")
-                    .setMessage("RuneLite will log in as "
-                            + JagexCredentials.load(this).getProperty("JX_DISPLAY_NAME", "the imported character")
-                            + ".\n\nRemove the imported credentials from this phone?")
+            new AlertDialog.Builder(this)
+                    .setTitle("Remove Jagex account?")
+                    .setMessage("RuneLite currently logs in as "
+                            + creds.getProperty("JX_DISPLAY_NAME", "the imported character")
+                            + ". Remove the imported credentials from this phone?")
                     .setPositiveButton("Remove", (d, w) -> {
                         JagexCredentials.delete(this);
-                        refreshSettings();
+                        refresh();
                     })
                     .setNegativeButton("Keep", null)
                     .show();
@@ -168,54 +276,20 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_IMPORT_CREDENTIALS || resultCode != RESULT_OK || data == null) return;
-        try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+        try (InputStream in = getContentResolver().openInputStream(data.getData())) {
             String error = JagexCredentials.importFrom(this, in);
-            android.widget.Toast.makeText(this, error == null ? "Jagex account imported" : error,
-                    android.widget.Toast.LENGTH_LONG).show();
+            Toast.makeText(this, error == null ? "Jagex account imported" : error, Toast.LENGTH_LONG).show();
         } catch (IOException e) {
-            android.widget.Toast.makeText(this, "Could not read file: " + e.getMessage(),
-                    android.widget.Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Could not read file: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-        refreshSettings();
+        refresh();
     }
 
-    private Button smallButton(String label, int color, View.OnClickListener onClick) {
-        Button b = bigButton(label, color, onClick);
-        b.setTextSize(14);
-        return b;
-    }
-
-    private Button bigButton(String label, int color, View.OnClickListener onClick) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextSize(20);
-        b.setTextColor(Color.WHITE);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(color);
-        bg.setCornerRadius(dp(12));
-        b.setBackground(bg);
-        b.setOnClickListener(onClick);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(64));
-        lp.topMargin = dp(12);
-        b.setLayoutParams(lp);
-        return b;
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        logView.setText(readLog());
-    }
+    // ------------------------------------------------------------ log
 
     private String readLog() {
         File f = JvmActivity.logFile(this);
-        if (!f.isFile()) return "No log yet. Tap a \"Run\" button above.";
+        if (!f.isFile()) return "No log yet. Press Play first.";
         try {
             return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -223,13 +297,106 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showLog() {
+        TextView t = text(readLog(), 11, TEXT);
+        t.setTypeface(Typeface.MONOSPACE);
+        t.setTextIsSelectable(true);
+        t.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ScrollView s = new ScrollView(this);
+        s.addView(t);
+        s.post(() -> s.fullScroll(View.FOCUS_DOWN));
+        new AlertDialog.Builder(this).setTitle("Last run").setView(s)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Share", (d, w) -> shareLog())
+                .show();
+    }
+
     private void shareLog() {
         String log = readLog();
         if (log.length() > 200_000) log = log.substring(log.length() - 200_000);
         Intent send = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
-                .putExtra(Intent.EXTRA_SUBJECT, "RuneLite Mobile JVM log")
+                .putExtra(Intent.EXTRA_SUBJECT, "RuneLite Mobile log")
                 .putExtra(Intent.EXTRA_TEXT, log);
         startActivity(Intent.createChooser(send, "Share log"));
+    }
+
+    // ------------------------------------------------------------ widgets
+
+    private interface Choice {
+        void chosen(int index);
+    }
+
+    /** Row of chips where exactly one is selected. */
+    private LinearLayout segmented(String[] labels, Choice onChoose) {
+        LinearLayout row = new LinearLayout(this);
+        for (int i = 0; i < labels.length; i++) {
+            final int idx = i;
+            TextView c = chip(labels[i], false);
+            c.setOnClickListener(v -> onChoose.chosen(idx));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (i > 0) lp.leftMargin = dp(8);
+            row.addView(c, lp);
+        }
+        return row;
+    }
+
+    private void select(LinearLayout segmented, int index) {
+        for (int i = 0; i < segmented.getChildCount(); i++) {
+            TextView c = (TextView) segmented.getChildAt(i);
+            boolean on = i == index;
+            c.setBackground(round(on ? 0x33DC8A00 : 0xFF2B2B2B, dp(10), on ? ORANGE : 0));
+            c.setTextColor(on ? ORANGE : TEXT);
+        }
+    }
+
+    private TextView chip(String label, boolean on) {
+        TextView c = text(label, 14, on ? ORANGE : TEXT);
+        c.setGravity(Gravity.CENTER);
+        c.setPadding(dp(16), dp(8), dp(16), dp(8));
+        c.setBackground(round(0xFF2B2B2B, dp(10), 0));
+        return c;
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(16), dp(14), dp(16), dp(14));
+        c.setBackground(round(CARD, dp(16), 0));
+        return c;
+    }
+
+    private TextView label(String s) {
+        TextView t = text(s, 11, MUTED);
+        t.setLetterSpacing(0.12f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private TextView text(String s, int sp, int color) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        return t;
+    }
+
+    private GradientDrawable round(int color, int radius, int stroke) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        if (stroke != 0) d.setStroke(dp(1), stroke);
+        return d;
+    }
+
+    private LinearLayout.LayoutParams marginTop(int px) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = px;
+        return lp;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 }

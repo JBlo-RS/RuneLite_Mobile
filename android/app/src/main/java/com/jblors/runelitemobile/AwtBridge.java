@@ -52,6 +52,12 @@ final class AwtBridge {
         key(awtKeyCode, down);
     }
 
+    /**
+     * Where the game canvas and the main window are on the virtual screen:
+     * {canvasX, canvasY, canvasW, canvasH, winX, winY, winW, winH}, or null if not known yet.
+     */
+    static native int[] layout();
+
     /** Maximizes resizable Java frames to the virtual screen (see jvmhelper WindowManager). */
     static native void installWindowManager();
 
