@@ -159,6 +159,12 @@ public final class ScreenCompositor {
     private static void refresh() {
         List<Overlay> next = new ArrayList<>();
         int[] newLayout = null;
+        // Cacio draws window decorations (title bar, close button) with Swing in a ProxyWindow
+        // that has the same bounds as the decorated window
+        List<Window> proxies = new ArrayList<>();
+        for (Window w : Window.getWindows()) {
+            if (w.isShowing() && w.getClass().getName().endsWith("ProxyWindow")) proxies.add(w);
+        }
         for (Window w : Window.getWindows()) {
             if (!w.isShowing() || w.getWidth() <= 0 || w.getHeight() <= 0) continue;
             if (w.getClass().getName().endsWith("ProxyWindow")) continue; // Cacio's internal peer window
@@ -174,7 +180,7 @@ public final class ScreenCompositor {
                 Overlay layer = mainLayer(w, canvases);
                 if (layer != null) next.add(0, layer); // under dialogs
             } else {
-                Overlay o = print(w, new ArrayList<>());
+                Overlay o = print(w, new ArrayList<>(), decorationOf(w, proxies));
                 if (o != null) next.add(o);
             }
         }
@@ -193,7 +199,7 @@ public final class ScreenCompositor {
         if (!stale && now - lastPrint < MIN_PRINT_INTERVAL_MS) return mainLayer;
         uiDirty = false;
         lastPrint = now;
-        Overlay o = print(w, canvases);
+        Overlay o = print(w, canvases, null);
         if (o != null) {
             mainLayer = o;
             mainLayerKey = key;
@@ -202,13 +208,32 @@ public final class ScreenCompositor {
         return mainLayer;
     }
 
-    /** Swing content of a window as an overlay; Window.printAll draws nothing under Cacio. */
-    private static Overlay print(Window w, List<Rectangle> holes) {
+    /** The Swing component Cacio uses to draw this window's decorations, or null. */
+    private static Component decorationOf(Window w, List<Window> proxies) {
+        if (w instanceof Frame && ((Frame) w).isUndecorated()) return null;
+        if (w instanceof java.awt.Dialog && ((java.awt.Dialog) w).isUndecorated()) return null;
+        if (w.getInsets().top <= 0) return null;
+        for (Window p : proxies) {
+            if (p.getBounds().equals(w.getBounds()) && p.getComponentCount() > 0) return p.getComponent(0);
+        }
+        return null;
+    }
+
+    /**
+     * Swing content of a window (plus its Cacio decoration, if any) as an overlay;
+     * Window.printAll draws nothing under Cacio.
+     */
+    private static Overlay print(Window w, List<Rectangle> holes, Component decoration) {
         JRootPane root = ((RootPaneContainer) w).getRootPane();
         if (root == null || root.getWidth() <= 0 || root.getHeight() <= 0) return null;
         BufferedImage img = new BufferedImage(w.getWidth(), w.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         try {
+            if (decoration != null && decoration.getWidth() > 0) {
+                Graphics2D dg = (Graphics2D) g.create();
+                decoration.printAll(dg); // frame border, title bar, close button
+                dg.dispose();
+            }
             g.translate(root.getX(), root.getY());
             root.printAll(g);
         } catch (RuntimeException e) {

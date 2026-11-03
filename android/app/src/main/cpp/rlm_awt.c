@@ -200,6 +200,21 @@ Java_com_jblors_runelitemobile_AwtBridge_layout(JNIEnv *aenv, jclass clazz) {
     return out;
 }
 
+// com.jblors.rlm.Sidebar.ensureOpen()
+JNIEXPORT void JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_ensureSidebarOpen(JNIEnv *aenv, jclass clazz) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL) return;
+    jclass sb = (*jenv)->FindClass(jenv, "com/jblors/rlm/Sidebar");
+    if (check_clear(jenv, "Sidebar lookup") || sb == NULL) return;
+    jmethodID m = (*jenv)->GetStaticMethodID(jenv, sb, "ensureOpen", "()V");
+    if (!check_clear(jenv, "Sidebar.ensureOpen lookup") && m != NULL) {
+        (*jenv)->CallStaticVoidMethod(jenv, sb, m);
+        check_clear(jenv, "Sidebar.ensureOpen");
+    }
+    (*jenv)->DeleteLocalRef(jenv, sb);
+}
+
 // com.jblors.rlm.Sidebar.selectTab(tooltip): show a RuneLite sidebar panel by its name
 JNIEXPORT void JNICALL
 Java_com_jblors_runelitemobile_AwtBridge_selectSidebarTab(JNIEnv *aenv, jclass clazz, jstring tooltip) {

@@ -388,11 +388,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     private void togglePanel() {
         boolean open = !screenLayout.isPanelOpen();
         if (open) {
-            // RuneLite's own sidebar must be open for there to be anything to show
-            if (screenLayout.panelSourceWidth() > 0
-                    && screenLayout.panelSourceWidth() < ScreenLayout.MIN_PANEL_WIDTH) {
-                openRuneLiteSidebar();
-            }
+            // RuneLite's sidebar itself is kept open by the render loop (ensureSidebarOpen)
             if (!panelOpenedBefore) {
                 panelOpenedBefore = true;
                 AwtBridge.selectSidebarTab("Configuration");
@@ -401,13 +397,6 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         screenLayout.setPanelOpen(open);
         if (panelHandle instanceof TextView) ((TextView) panelHandle).setText(open ? "▶" : "◀");
         lastGesture = open ? "panel opened" : "panel closed";
-    }
-
-    /** RuneLite's default sidebar toggle hotkey, Ctrl+F11. */
-    private void openRuneLiteSidebar() {
-        AwtBridge.key(KeyMap.VK_CONTROL, true);
-        AwtBridge.tapKey(KeyMap.VK_F1 + 10);
-        AwtBridge.key(KeyMap.VK_CONTROL, false);
     }
 
     /** Moves the drawer tab along with the panel's left edge (UI thread). */
@@ -589,7 +578,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         Paint shadow = new Paint();
         shadow.setColor(0x99000000);
         int[] awtLayout = null;
-        long lastLayoutQuery = 0, lastFrame = System.nanoTime();
+        long lastLayoutQuery = 0, lastSidebarCheck = 0, lastFrame = System.nanoTime();
         int lastPanelLeft = Integer.MIN_VALUE;
         long windowStart = System.nanoTime();
         int frames = 0;
@@ -612,6 +601,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                     if (screenLayout.isMobile() && nowNs - lastLayoutQuery > 250_000_000L) {
                         awtLayout = AwtBridge.layout(); // where the game canvas is right now
                         lastLayoutQuery = nowNs;
+                        if (awtLayout != null && nowNs - lastSidebarCheck > 1_000_000_000L) {
+                            lastSidebarCheck = nowNs;
+                            AwtBridge.ensureSidebarOpen(); // a closed sidebar gives black bars
+                        }
                     }
                     screenLayout.update(cw, ch, screenW, screenH, awtLayout, (nowNs - lastFrame) / 1e9f);
                     lastFrame = nowNs;

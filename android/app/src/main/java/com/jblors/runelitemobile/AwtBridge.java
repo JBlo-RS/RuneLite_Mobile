@@ -58,6 +58,9 @@ final class AwtBridge {
      */
     static native int[] layout();
 
+    /** Opens RuneLite's sidebar if it is closed (mobile layout keeps it open off screen). */
+    static native void ensureSidebarOpen();
+
     /** Shows the RuneLite sidebar panel whose button has this tooltip, e.g. "Configuration". */
     static native void selectSidebarTab(String tooltip);
 
