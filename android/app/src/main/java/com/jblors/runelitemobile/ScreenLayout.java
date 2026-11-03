@@ -30,6 +30,8 @@ final class ScreenLayout {
     /** 0 = closed, 1 = open; animated by the render thread toward the target. */
     private float panelProgress;
     private volatile boolean panelOpen;
+    /** Vertical margin for the panel so its icons clear rounded screen corners (px). */
+    private volatile int cornerInset;
 
     ScreenLayout(boolean mobile) {
         this.mobile = mobile;
@@ -41,6 +43,10 @@ final class ScreenLayout {
 
     boolean isPanelOpen() {
         return panelOpen;
+    }
+
+    void setCornerInset(int px) {
+        cornerInset = Math.max(0, px);
     }
 
     void setPanelOpen(boolean open) {
@@ -83,7 +89,9 @@ final class ScreenLayout {
         // RuneLite's sidebar: everything right of the game canvas, over the canvas's height
         int pw = Math.max(0, winRight - (cx + cw));
         panelSrcWidth = pw;
-        float scale = surfaceH / (float) ch;
+        int inset = Math.min(cornerInset, surfaceH / 6);
+        int panelH = surfaceH - 2 * inset;
+        float scale = panelH / (float) ch;
         panelWidthPx = Math.min(surfaceW, Math.round(pw * scale));
 
         float target = panelOpen ? 1f : 0f;
@@ -97,7 +105,7 @@ final class ScreenLayout {
             Mapping panel = new Mapping();
             panel.src.set(cx + cw, cy, winRight, cy + ch);
             int left = surfaceW - Math.round(panelWidthPx * panelProgress);
-            panel.dst.set(left, 0, left + panelWidthPx, surfaceH);
+            panel.dst.set(left, inset, left + panelWidthPx, inset + panelH);
             mappings = new Mapping[]{game, panel};
         }
         return panelProgress != target;

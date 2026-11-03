@@ -200,6 +200,25 @@ Java_com_jblors_runelitemobile_AwtBridge_layout(JNIEnv *aenv, jclass clazz) {
     return out;
 }
 
+// com.jblors.rlm.Sidebar.selectTab(tooltip): show a RuneLite sidebar panel by its name
+JNIEXPORT void JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_selectSidebarTab(JNIEnv *aenv, jclass clazz, jstring tooltip) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL) return;
+    jclass sb = (*jenv)->FindClass(jenv, "com/jblors/rlm/Sidebar");
+    if (check_clear(jenv, "Sidebar lookup") || sb == NULL) return;
+    jmethodID sel = (*jenv)->GetStaticMethodID(jenv, sb, "selectTab", "(Ljava/lang/String;)V");
+    if (!check_clear(jenv, "Sidebar.selectTab lookup") && sel != NULL) {
+        const char *utf = (*aenv)->GetStringUTFChars(aenv, tooltip, NULL);
+        jstring jt = (*jenv)->NewStringUTF(jenv, utf); // strings don't cross VMs; copy
+        (*aenv)->ReleaseStringUTFChars(aenv, tooltip, utf);
+        (*jenv)->CallStaticVoidMethod(jenv, sb, sel, jt);
+        check_clear(jenv, "Sidebar.selectTab");
+        (*jenv)->DeleteLocalRef(jenv, jt);
+    }
+    (*jenv)->DeleteLocalRef(jenv, sb);
+}
+
 // Installs com.jblors.rlm.WindowManager (maximizes resizable frames). Call once AWT is up.
 JNIEXPORT void JNICALL
 Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jclass clazz) {

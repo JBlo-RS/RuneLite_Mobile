@@ -218,25 +218,61 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         hideSystemBars(root);
     }
 
-    /** Mobile layout: small translucent buttons over the game, and the sidebar's drawer tab. */
+    /** Mobile layout: a movable, collapsible button column and a movable drawer tab. */
     private void addFloatingControls(FrameLayout game) {
+        android.content.SharedPreferences prefs = getSharedPreferences("overlay", MODE_PRIVATE);
+
+        // --- button column, with a grip: tap = collapse/expand, drag = move
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
-        column.addView(floatingButton(stripButton("⌨", false, v -> keyboard.toggle())));
-        column.addView(floatingButton(modifierButton("Alt", KeyMap.VK_ALT)));
-        column.addView(floatingButton(modifierButton("Shift", KeyMap.VK_SHIFT)));
-        column.addView(floatingButton(modifierButton("Ctrl", KeyMap.VK_CONTROL)));
-        column.addView(floatingButton(stripButton("Esc", false, v -> {
+        column.setGravity(Gravity.CENTER_HORIZONTAL);
+        TextView grip = new TextView(this);
+        grip.setText("⠿");
+        grip.setTextSize(18);
+        grip.setTextColor(0xCCFFFFFF);
+        grip.setGravity(Gravity.CENTER);
+        grip.setBackground(roundRect(0x99222222));
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(dp(48), dp(28));
+        glp.bottomMargin = dp(6);
+        column.addView(grip, glp);
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.VERTICAL);
+        buttons.addView(floatingButton(stripButton("⌨", false, v -> keyboard.toggle())));
+        buttons.addView(floatingButton(modifierButton("Alt", KeyMap.VK_ALT)));
+        buttons.addView(floatingButton(modifierButton("Shift", KeyMap.VK_SHIFT)));
+        buttons.addView(floatingButton(modifierButton("Ctrl", KeyMap.VK_CONTROL)));
+        buttons.addView(floatingButton(stripButton("Esc", false, v -> {
             AwtBridge.tapKey(KeyMap.VK_ESCAPE);
             lastGesture = "Esc";
         })));
-        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.START | Gravity.CENTER_VERTICAL);
-        clp.leftMargin = dp(8);
-        game.addView(column, clp);
+        column.addView(buttons);
+        buttons.setVisibility(prefs.getBoolean("collapsed", false) ? View.GONE : View.VISIBLE);
 
-        // Drawer tab on the right edge: slides RuneLite's sidebar in and out
+        game.addView(column, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.START));
+        float colX = prefs.getFloat("columnX", -1f), colY = prefs.getFloat("columnY", -1f);
+        game.post(() -> {
+            // Default: left edge, vertically centred
+            float x = colX >= 0 ? colX * game.getWidth() : dp(8);
+            float y = colY >= 0 ? colY * game.getHeight() : (game.getHeight() - column.getHeight()) / 2f;
+            column.setX(clampF(x, 0, game.getWidth() - column.getWidth()));
+            column.setY(clampF(y, 0, game.getHeight() - column.getHeight()));
+        });
+        grip.setOnTouchListener(new Draggable(column, true, true,
+                () -> {
+                    boolean collapse = buttons.getVisibility() == View.VISIBLE;
+                    buttons.setVisibility(collapse ? View.GONE : View.VISIBLE);
+                    prefs.edit().putBoolean("collapsed", collapse).apply();
+                    lastGesture = collapse ? "controls collapsed" : "controls expanded";
+                },
+                () -> prefs.edit()
+                        .putFloat("columnX", column.getX() / Math.max(1, game.getWidth()))
+                        .putFloat("columnY", column.getY() / Math.max(1, game.getHeight()))
+                        .apply()));
+
+        // --- drawer tab on the right edge: tap = slide the sidebar in/out, drag = move up/down
         TextView tab = new TextView(this);
         tab.setText("◀");
         tab.setTextSize(16);
@@ -248,11 +284,92 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         float r = dp(12);
         bg.setCornerRadii(new float[]{r, r, 0, 0, 0, 0, r, r});
         tab.setBackground(bg);
-        tab.setOnClickListener(v -> togglePanel());
-        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(dp(30), dp(76),
-                Gravity.END | Gravity.CENTER_VERTICAL);
-        game.addView(tab, tlp);
+        game.addView(tab, new FrameLayout.LayoutParams(dp(30), dp(76), Gravity.TOP | Gravity.END));
+        float tabY = prefs.getFloat("tabY", 0.36f); // fraction of height for the tab's centre
+        game.post(() -> tab.setY(clampF(tabY * game.getHeight() - tab.getHeight() / 2f,
+                0, game.getHeight() - tab.getHeight())));
+        tab.setOnTouchListener(new Draggable(tab, false, true, this::togglePanel,
+                () -> prefs.edit().putFloat("tabY",
+                        (tab.getY() + tab.getHeight() / 2f) / Math.max(1, game.getHeight())).apply()));
         panelHandle = tab;
+
+        // Keep the panel's icons clear of rounded screen corners
+        game.post(() -> screenLayout.setCornerInset(roundedCornerInset()));
+    }
+
+    private static float clampF(float v, float lo, float hi) {
+        return Math.max(lo, Math.min(v, Math.max(lo, hi)));
+    }
+
+    /** Margin that keeps icons at the right edge clear of the screen's rounded corners. */
+    private int roundedCornerInset() {
+        if (Build.VERSION.SDK_INT < 31) return 0;
+        WindowInsets in = getWindow().getDecorView().getRootWindowInsets();
+        if (in == null) return 0;
+        int radius = 0;
+        for (int pos : new int[]{android.view.RoundedCorner.POSITION_TOP_RIGHT,
+                android.view.RoundedCorner.POSITION_BOTTOM_RIGHT}) {
+            android.view.RoundedCorner rc = in.getRoundedCorner(pos);
+            if (rc != null) radius = Math.max(radius, rc.getRadius());
+        }
+        // An icon a few px from the edge is clear of the curve about half a radius in
+        int inset = Math.round(radius * 0.55f);
+        append("display: rounded corner radius " + radius + " px, panel inset " + inset + " px");
+        return inset;
+    }
+
+    /**
+     * Touch handler for a floating control: a tap runs onTap, a drag moves {@code target}
+     * (horizontally and/or vertically, kept inside the parent) and then runs onMoved.
+     */
+    private final class Draggable implements View.OnTouchListener {
+        private final View target;
+        private final boolean horizontal, vertical;
+        private final Runnable onTap, onMoved;
+        private final float slop = dp(8);
+        private float downRawX, downRawY, startX, startY;
+        private boolean dragging;
+
+        Draggable(View target, boolean horizontal, boolean vertical, Runnable onTap, Runnable onMoved) {
+            this.target = target;
+            this.horizontal = horizontal;
+            this.vertical = vertical;
+            this.onTap = onTap;
+            this.onMoved = onMoved;
+        }
+
+        @Override
+        public boolean onTouch(View v, android.view.MotionEvent e) {
+            View parent = (View) target.getParent();
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    downRawX = e.getRawX();
+                    downRawY = e.getRawY();
+                    startX = target.getX();
+                    startY = target.getY();
+                    dragging = false;
+                    v.setPressed(true);
+                    return true;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    float dx = e.getRawX() - downRawX, dy = e.getRawY() - downRawY;
+                    if (!dragging && Math.hypot(dx, dy) > slop) dragging = true;
+                    if (dragging) {
+                        if (horizontal) target.setX(clampF(startX + dx, 0, parent.getWidth() - target.getWidth()));
+                        if (vertical) target.setY(clampF(startY + dy, 0, parent.getHeight() - target.getHeight()));
+                    }
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                    v.setPressed(false);
+                    if (dragging) onMoved.run();
+                    else onTap.run();
+                    return true;
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    v.setPressed(false);
+                    if (dragging) onMoved.run();
+                    return true;
+            }
+            return false;
+        }
     }
 
     /** Wraps a strip button for the floating column: smaller, translucent. */
@@ -260,17 +377,26 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(48), dp(40));
         lp.bottomMargin = dp(6);
         b.setLayoutParams(lp);
-        b.setAlpha(0.8f);
+        b.setAlpha(0.85f);
         if (b.getTag() == null) b.setBackground(roundRect(0x99222222));
         return b;
     }
 
+    /** First panel opening in this run shows RuneLite's Configuration (wrench) panel. */
+    private boolean panelOpenedBefore;
+
     private void togglePanel() {
         boolean open = !screenLayout.isPanelOpen();
-        // RuneLite's own sidebar must be open for there to be anything to show
-        if (open && screenLayout.panelSourceWidth() > 0
-                && screenLayout.panelSourceWidth() < ScreenLayout.MIN_PANEL_WIDTH) {
-            openRuneLiteSidebar();
+        if (open) {
+            // RuneLite's own sidebar must be open for there to be anything to show
+            if (screenLayout.panelSourceWidth() > 0
+                    && screenLayout.panelSourceWidth() < ScreenLayout.MIN_PANEL_WIDTH) {
+                openRuneLiteSidebar();
+            }
+            if (!panelOpenedBefore) {
+                panelOpenedBefore = true;
+                AwtBridge.selectSidebarTab("Configuration");
+            }
         }
         screenLayout.setPanelOpen(open);
         if (panelHandle instanceof TextView) ((TextView) panelHandle).setText(open ? "▶" : "◀");

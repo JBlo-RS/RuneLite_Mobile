@@ -58,6 +58,9 @@ final class AwtBridge {
      */
     static native int[] layout();
 
+    /** Shows the RuneLite sidebar panel whose button has this tooltip, e.g. "Configuration". */
+    static native void selectSidebarTab(String tooltip);
+
     /** Maximizes resizable Java frames to the virtual screen (see jvmhelper WindowManager). */
     static native void installWindowManager();
 
