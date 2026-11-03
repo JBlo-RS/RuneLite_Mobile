@@ -80,7 +80,8 @@ public final class WindowManager {
                     EventQueue.invokeLater(() -> {
                         if (w instanceof Frame && maximizable((Frame) w)) fill((Frame) w);
                         else if (w instanceof Frame) center(w); // e.g. the launcher/client splash
-                        else keepOnScreen(w);
+                        else if (w instanceof java.awt.Dialog) centerOverGame(w); // e.g. colour picker
+                        else keepOnScreen(w); // popups, tooltips: stay where they opened
                         w.toFront();
                         w.requestFocus();
                     });
@@ -126,6 +127,24 @@ public final class WindowManager {
             w.toFront();
             w.setAutoRequestFocus(auto);
             log("raised above owner", w);
+        }
+    }
+
+    /**
+     * Centre a dialog over the game canvas, which is the part of the screen the mobile layout
+     * shows, so its title bar and close button are visible. Falls back to the whole screen.
+     */
+    private static void centerOverGame(Window w) {
+        if (!w.isShowing()) return;
+        int[] l = ScreenCompositor.layout();
+        Rectangle area = l != null ? new Rectangle(l[0], l[1], l[2], l[3]) : w.getGraphicsConfiguration().getBounds();
+        int x = area.x + (area.width - w.getWidth()) / 2, y = area.y + (area.height - w.getHeight()) / 2;
+        // Keep the top-left (title bar, close button) inside the visible area even if it's big
+        x = Math.max(area.x, x);
+        y = Math.max(area.y, y);
+        if (x != w.getX() || y != w.getY()) {
+            w.setLocation(x, y);
+            log("centred over game", w);
         }
     }
 
