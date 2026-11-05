@@ -58,6 +58,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final String MODE_RUNELITE = "runelite";
     /** RuneLite client started by our DevLaunch (no launcher) so --developer-mode applies. */
     static final String MODE_RUNELITE_DEV = "runelite-dev";
+    /** No JVM: checks whether desktop OpenGL works on this phone through Zink. */
+    static final String MODE_GPU_TEST = "gpu-test";
 
     /**
      * RuneLite's clientJvm17Arguments from bootstrap.json. In REFLECT mode the launcher runs
@@ -507,6 +509,28 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         append("jagex: wrote credentials.properties for developer mode");
     }
 
+    /** GPU test: runs in this (separate) process so a driver crash only ends this screen. */
+    private void runGpuTest() {
+        String err = NativeBridge.redirectStdio(log.getAbsolutePath());
+        if (err != null) append("stdio redirect failed: " + err);
+        append("== GPU test: desktop OpenGL through Mesa Zink (OpenGL on Vulkan)");
+        String osmesa = new File(getApplicationInfo().nativeLibraryDir, "libOSMesa.so").getAbsolutePath();
+        String report = GpuProbe.run(osmesa);
+        append("== GPU test finished");
+        ui.post(() -> {
+            if (text != null) refreshLog();
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("GPU test result")
+                    .setMessage(report.substring(report.lastIndexOf("RESULT:") >= 0 ? report.lastIndexOf("RESULT:") : 0))
+                    .setPositiveButton("Close", (d, w) -> {
+                        finish();
+                        Process.killProcess(Process.myPid());
+                    })
+                    .setCancelable(false)
+                    .show();
+        });
+    }
+
     private boolean isGraphical() {
         return MODE_SWING_DEMO.equals(mode) || MODE_RUNELITE.equals(mode) || MODE_RUNELITE_DEV.equals(mode);
     }
@@ -687,6 +711,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             append("page size: " + Os.sysconf(OsConstants._SC_PAGESIZE));
             append("cpus: " + Runtime.getRuntime().availableProcessors());
 
+            if (MODE_GPU_TEST.equals(mode)) {
+                runGpuTest();
+                return;
+            }
             File jre = JreInstaller.ensureInstalled(this, this::append);
             File jars = new File(getFilesDir(), "jars");
             List<String> args = new ArrayList<>();

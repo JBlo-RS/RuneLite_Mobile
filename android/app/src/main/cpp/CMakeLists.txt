@@ -17,7 +17,11 @@ add_library(awt_xawt SHARED xawt_stub.c)
 # --no-as-needed: nothing here calls into libawt_headless, but the DT_NEEDED entry is the point
 target_link_libraries(awt_xawt "-Wl,--no-as-needed" awt_headless)
 
-foreach(t rlm pojavexec_awt awt_xawt)
+# GPU feasibility test (Zink via OSMesa); see gpu_probe.c
+add_library(rlmgpu SHARED gpu_probe.c)
+target_link_libraries(rlmgpu log dl)
+
+foreach(t rlm pojavexec_awt awt_xawt rlmgpu)
     target_compile_options(${t} PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # 16 KB page alignment (also set via ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES)
     target_link_options(${t} PRIVATE -Wl,-z,max-page-size=16384)

@@ -181,6 +181,8 @@ public class MainActivity extends Activity {
         more.addView(moreItem("Share log", "Send the last run's log", v -> shareLog()));
         more.addView(moreItem("Swing demo", "Test touch, keyboard and drawing", v -> launch(JvmActivity.MODE_SWING_DEMO)));
         more.addView(moreItem("JVM probe", "Test the Java runtime", v -> launch(JvmActivity.MODE_PROBE)));
+        more.addView(moreItem("GPU test", "Check whether the GPU plugin could work on this phone",
+                v -> launch(JvmActivity.MODE_GPU_TEST)));
         card.addView(more);
         return card;
     }
