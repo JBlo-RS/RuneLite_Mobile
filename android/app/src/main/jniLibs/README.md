@@ -9,3 +9,10 @@ It is only used by the "GPU test" (`src/main/cpp/gpu_probe.c`), which checks whe
 desktop OpenGL 3.3+ (what RuneLite's GPU plugin needs) works on the phone through Zink.
 If the GPU plugin goes ahead, this should be replaced with a Mesa build made by this
 project.
+
+`arm64-v8a/liblwjgl.so` and `arm64-v8a/liblwjgl_opengl.so` are LWJGL 3.3.2's native
+libraries (the version RuneLite's client uses) built for Android by
+`tools/build-lwjgl-android.sh`, with libffi 3.4.4 linked statically. LWJGL is BSD-3-Clause
+licensed and libffi MIT. Every native method in RuneLite's lwjgl-3.3.2 and
+lwjgl-opengl-3.3.2 jars has a matching symbol, except the Windows, macOS and Linux io_uring
+bindings, which RuneLite does not use on this platform.
