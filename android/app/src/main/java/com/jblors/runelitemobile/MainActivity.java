@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     private static final int MUTED = 0xFF8C8C8C;
 
     private TextView accountName, accountHint, accountAction;
-    private LinearLayout layoutChoice, sizeChoice, more;
+    private LinearLayout layoutChoice, sizeChoice, gpuChoice, more;
     private TextView moreToggle;
 
     @Override
@@ -158,6 +158,16 @@ public class MainActivity extends Activity {
             refresh();
         });
         card.addView(sizeChoice, marginTop(dp(8)));
+
+        card.addView(label("GPU (EXPERIMENTAL)"), marginTop(dp(16)));
+        gpuChoice = segmented(new String[]{"Off", "On"}, i -> {
+            prefs().edit().putBoolean("gpu", i == 1).apply();
+            refresh();
+        });
+        card.addView(gpuChoice, marginTop(dp(8)));
+        card.addView(text("On: RuneLite's GPU plugin can draw the game with the phone's GPU "
+                + "(OpenGL through Zink on Vulkan). Turn the GPU plugin on in RuneLite's "
+                + "plugin list too.", 12, MUTED), marginTop(dp(6)));
         return card;
     }
 
@@ -215,6 +225,10 @@ public class MainActivity extends Activity {
         return 1;
     }
 
+    private boolean gpu() {
+        return prefs().getBoolean("gpu", false);
+    }
+
     private boolean mobileLayout() {
         return prefs().getBoolean("mobileLayout", true);
     }
@@ -223,6 +237,7 @@ public class MainActivity extends Activity {
         if (layoutChoice == null) return;
         select(layoutChoice, mobileLayout() ? 0 : 1);
         select(sizeChoice, uiSizeIndex());
+        select(gpuChoice, gpu() ? 1 : 0);
         Properties creds = JagexCredentials.load(this);
         if (creds == null) {
             accountName.setText("No Jagex account");
@@ -238,7 +253,8 @@ public class MainActivity extends Activity {
     private void launch(String mode) {
         startActivity(JvmActivity.intent(this, mode)
                 .putExtra(JvmActivity.EXTRA_SCREEN_HEIGHT, UI_SIZES[uiSizeIndex()])
-                .putExtra(JvmActivity.EXTRA_MOBILE_LAYOUT, mobileLayout()));
+                .putExtra(JvmActivity.EXTRA_MOBILE_LAYOUT, mobileLayout())
+                .putExtra(JvmActivity.EXTRA_GPU, gpu()));
     }
 
     private void onAccountAction() {

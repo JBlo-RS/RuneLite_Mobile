@@ -21,7 +21,11 @@ target_link_libraries(awt_xawt "-Wl,--no-as-needed" awt_headless)
 add_library(rlmgpu SHARED gpu_probe.c)
 target_link_libraries(rlmgpu log dl)
 
-foreach(t rlm pojavexec_awt awt_xawt rlmgpu)
+# OpenGL for RuneLite's GPU plugin (natives of net.runelite.rlawt.AWTContext); see rlm_gl.c
+add_library(rlmgl SHARED rlm_gl.c)
+target_link_libraries(rlmgl log dl)
+
+foreach(t rlm pojavexec_awt awt_xawt rlmgpu rlmgl)
     target_compile_options(${t} PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # 16 KB page alignment (also set via ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES)
     target_link_options(${t} PRIVATE -Wl,-z,max-page-size=16384)

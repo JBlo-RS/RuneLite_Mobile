@@ -8,7 +8,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 3. Map Android touch and keyboard input to AWT events (cf. Pojav's
    `AWTInputBridge` / `awt_bridge.c`).
 4. Launch the unmodified RuneLite launcher jar.
-5. Later: GPU plugin via GL4ES or Zink.
+5. GPU plugin: desktop OpenGL through Mesa's Zink driver (OpenGL on Vulkan) via OSMesa.
 
 ## Status
 
@@ -21,11 +21,13 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 | Milestone 1: in-process JVM launcher + probe, all checks pass on Galaxy A56 (Android 16) | done |
 | Milestone 2: Swing via Caciocavallo on a `SurfaceView`, smooth at ~60 repaints/s on device | done |
 | Milestone 3: touch / keyboard input (tap, drag, Samsung keyboard verified on device) | done |
-| Milestone 4: stock RuneLite launcher in REFLECT mode, window maximized (client reaches its UI on desktop JDK 17) | awaiting device test |
+| Milestone 4: stock RuneLite launcher in REFLECT mode, window maximized (client reaches its UI on desktop JDK 17) | done |
+| GPU test: Zink gives OpenGL 4.6 on the Galaxy A56 (Xclipse 540, Vulkan 1.3) | done |
+| GPU plugin: rlawt replacement + LWJGL 3.3.2 natives for Android (verified on desktop with Mesa llvmpipe) | awaiting device test |
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.7.0-gputest-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.8.0-gpu-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -38,6 +40,26 @@ The probe tests JIT, threads, zip, font rendering (freetype) and HTTPS
 (`static.runelite.net`). A good run ends with `ALL CHECKS PASSED`.
 
 Every APK is signed with `android/debug.keystore`, so new builds install over old ones.
+
+## GPU plugin (experimental)
+
+Turn **GPU** on in the app, start RuneLite, then enable the **GPU** plugin in RuneLite's plugin list.
+
+How it works:
+
+- `android/jvmhelper/.../net/runelite/rlawt/AWTContext.java` replaces RuneLite's rlawt, which needs
+  JAWT and X11. It is on the boot class path, so it is found first.
+- Its native side, `android/app/src/main/cpp/rlm_gl.c` (`librlmgl.so`), creates an OSMesa context
+  with Mesa's Zink driver (PojavLauncher's Mesa 23.0.4 build, `jniLibs/arm64-v8a/libOSMesa.so`).
+  It renders into a memory buffer the size of the game canvas.
+- `swapBuffers` publishes each frame. `ScreenCompositor` copies it into the canvas area of the
+  screen sent to Android, under the RuneLite UI and dialogs.
+- LWJGL's own natives (`liblwjgl.so`, `liblwjgl_opengl.so`) are built for Android by
+  `tools/build-lwjgl-android.sh`.
+- LWJGL gets its GL functions from `OSMesaGetProcAddress`, because OSMesa doesn't export all of
+  them by name.
+- With GPU off, `AWTContext.loadNatives()` throws, and RuneLite turns the GPU plugin off as it
+  does on a PC without GPU support.
 
 ## Input
 

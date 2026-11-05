@@ -116,11 +116,14 @@ public final class ScreenCompositor {
         }
         int[] base = (int[]) screenRgb.invoke(null); // a fresh copy, safe to modify
         if (base == null) return null;
-        List<Overlay> list = overlays;
-        if (list.isEmpty()) return base;
         java.awt.Dimension size = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
         int sw = size.width, sh = size.height;
         if (base.length != sw * sh) return base;
+        // GPU plugin: its OpenGL frame replaces the game canvas (the UI layer has a hole there)
+        int[] l = layout;
+        if (l != null) net.runelite.rlawt.AWTContext.blitFrame(base, sw, sh, l[0], l[1], l[2], l[3]);
+        List<Overlay> list = overlays;
+        if (list.isEmpty()) return base;
         for (Overlay o : list) blit(o, base, sw, sh);
         return base;
     }

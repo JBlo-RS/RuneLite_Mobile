@@ -81,10 +81,23 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final int DEFAULT_SCREEN_HEIGHT = 630;
     /** Intent extra: true = mobile layout (full-screen game, slide-in sidebar). */
     static final String EXTRA_MOBILE_LAYOUT = "mobileLayout";
+    /** Intent extra: true = give RuneLite's GPU plugin an OpenGL context (Zink via OSMesa). */
+    static final String EXTRA_GPU = "gpu";
 
     /** RuneLite's sidebar incl. its icon strip, and its title bar, in virtual px (measured). */
     private static final int RUNELITE_SIDEBAR_W = 274;
     private static final int RUNELITE_TITLE_H = 26;
+
+    /** JVM properties for the GPU plugin: our rlawt (net.runelite.rlawt.AWTContext) and LWJGL. */
+    private List<String> gpuArgs() {
+        String dir = getApplicationInfo().nativeLibraryDir;
+        append("gpu: on (Zink via OSMesa)");
+        return Arrays.asList(
+                "-Drlm.gl.lib=" + new File(dir, "librlmgl.so").getAbsolutePath(),
+                "-Drlm.gl.osmesa=" + new File(dir, "libOSMesa.so").getAbsolutePath(),
+                "-Dorg.lwjgl.librarypath=" + dir,
+                "-Dorg.lwjgl.opengl.explicitInit=true");
+    }
 
     static File logFile(Context ctx) {
         return new File(ctx.getFilesDir(), "jvm.log");
@@ -725,6 +738,10 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 for (String name : getAssets().list("cacio"))
                     JreInstaller.copyAsset(this, "cacio/" + name, new File(cacio, name));
                 args.addAll(JvmLauncher.cacioArgs(cacio, screenW, screenH));
+                if ((MODE_RUNELITE.equals(mode) || MODE_RUNELITE_DEV.equals(mode))
+                        && getIntent().getBooleanExtra(EXTRA_GPU, false)) {
+                    args.addAll(gpuArgs());
+                }
                 if (MODE_RUNELITE_DEV.equals(mode)) {
                     args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
                     args.add("-ea"); // RuneLite refuses developer mode without assertions
