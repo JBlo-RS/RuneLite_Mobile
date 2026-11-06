@@ -84,10 +84,6 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final String EXTRA_MOBILE_LAYOUT = "mobileLayout";
     /** Intent extra: true = give RuneLite's GPU plugin an OpenGL context (Zink via OSMesa). */
     static final String EXTRA_GPU = "gpu";
-    /** Intent extra: enlargement of the minimap, side panel and chat (1 = off); see UiMagnifier. */
-    static final String EXTRA_UI_SCALE = "uiScale";
-    private UiMagnifier magnifier = new UiMagnifier(1f);
-
     /** Intent extra: true = enlarge the game picture with nearest-neighbour (crisp) scaling. */
     static final String EXTRA_SHARP_SCALING = "sharpScaling";
 
@@ -225,13 +221,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         FrameLayout game = new FrameLayout(this);
         SurfaceView sv = new SurfaceView(this);
         sv.getHolder().addCallback(this);
-        magnifier = new UiMagnifier(getIntent().getFloatExtra(EXTRA_UI_SCALE, 1f));
-        TouchInput touch = new TouchInput(getResources().getDisplayMetrics().density, (x, y) -> {
-            // Enlarged interface panels first, unless RuneLite's sidebar is over that spot
-            boolean onPanel = screenLayout.isPanelOpen() && x >= screenLayout.panelLeft(sv.getWidth());
-            int[] p = onPanel ? null : magnifier.toScreen(x, y);
-            return p != null ? p : screenLayout.toScreen(x, y);
-        }, g -> lastGesture = g);
+        TouchInput touch = new TouchInput(getResources().getDisplayMetrics().density,
+                (x, y) -> screenLayout.toScreen(x, y), g -> lastGesture = g);
         sv.setOnTouchListener(touch);
         sv.setOnGenericMotionListener(touch);
         touch.setTapButton(this::tapButton);
@@ -781,8 +772,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         Paint shadow = new Paint();
         shadow.setColor(0x99000000);
         int[] awtLayout = null;
-        long lastLayoutQuery = 0, lastSidebarCheck = 0, lastFrame = System.nanoTime(), lastUiQuery = 0;
-        String uiSpec = null;
+        long lastLayoutQuery = 0, lastSidebarCheck = 0, lastFrame = System.nanoTime();
         int lastPanelLeft = Integer.MIN_VALUE;
         long windowStart = System.nanoTime();
         int frames = 0;
@@ -802,21 +792,15 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                     c = holder.getSurface().lockHardwareCanvas();
                     int cw = c.getWidth(), ch = c.getHeight();
                     long nowNs = System.nanoTime();
-                    if ((screenLayout.isMobile() || magnifier.enabled()) && nowNs - lastLayoutQuery > 250_000_000L) {
+                    if (screenLayout.isMobile() && nowNs - lastLayoutQuery > 250_000_000L) {
                         awtLayout = AwtBridge.layout(); // where the game canvas is right now
                         lastLayoutQuery = nowNs;
-                        if (screenLayout.isMobile() && awtLayout != null && nowNs - lastSidebarCheck > 1_000_000_000L) {
+                        if (awtLayout != null && nowNs - lastSidebarCheck > 1_000_000_000L) {
                             lastSidebarCheck = nowNs;
                             AwtBridge.ensureSidebarOpen(); // a closed sidebar gives black bars
                         }
                     }
-                    if (magnifier.enabled() && nowNs - lastUiQuery > 100_000_000L) {
-                        uiSpec = AwtBridge.jvmProperty("rlm.ui.regions"); // from the Mobile Controls plugin
-                        lastUiQuery = nowNs;
-                    }
-                    // Mobile layout: layout() is only queried there, so the canvas is at its origin otherwise
-                    screenLayout.update(cw, ch, screenW, screenH, screenLayout.isMobile() ? awtLayout : null,
-                            (nowNs - lastFrame) / 1e9f);
+                    screenLayout.update(cw, ch, screenW, screenH, awtLayout, (nowNs - lastFrame) / 1e9f);
                     lastFrame = nowNs;
                     c.drawColor(Color.BLACK);
                     ScreenLayout.Mapping[] maps = screenLayout.mappings();
@@ -838,11 +822,6 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                             }
                         }
                         c.drawBitmap(frame, m.src, m.dst, paint);
-                        if (i == 0 && magnifier.enabled()) {
-                            magnifier.update(uiSpec, awtLayout == null ? 0 : awtLayout[0],
-                                    awtLayout == null ? 0 : awtLayout[1], m);
-                            if (awtLayout != null) magnifier.draw(c, frame);
-                        }
                     }
                     int panelLeft = screenLayout.panelLeft(cw);
                     if (panelLeft != lastPanelLeft) {

@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.17.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.17.1-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -73,13 +73,21 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 
 | Plugin | What it does |
 | --- | --- |
-| Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). In resizable layouts, it also tells the app where the minimap, side panel and chatbox are (`rlm.ui.regions`), for the app's Interface scale setting: the app (`UiMagnifier`) draws those panels enlarged with nearest-neighbour pixels, anchored to their corners, and maps taps back. Nothing is enlarged while a right-click menu or a main interface such as the bank is open. |
+| Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). |
 | Big Status Bars (`plugins/rlm-mobile`) | Large Hitpoints and Prayer bars, optionally special attack and run energy; HP turns green when poisoned and dark green when envenomed, and HP and Prayer flash below set thresholds. Movable (hold Alt and drag). |
 | Big Menu (`plugins/rlm-mobile`) | Draws the right-click menu large (row height, text size and width can be set) over the game's own menu, with the game's colours. A RuneLite mouse listener moves taps and cursor movement inside it to the matching row of the game's menu (19 px header, 15 px rows, newest entry on top), like stretched mode scales clicks: one tap, one click. |
 | Skilling Helper (`plugins/rlm-skilling`) | Remembers the last tree, rock or fishing spot you used. While you're idle, it outlines the nearest one of that kind (rocks by object ID, trees by name and their chop option, fishing spots by NPC ID). With a full inventory it outlines the nearest bank booth, bank chest, deposit box or banker instead. It only highlights. |
 | Boss Helper (`plugins/rlm-bosses`) | Scurrius, TzTok-Jad / JalTok-Jad, Dagannoth Kings, Phantom Muspah, Sarachnis, Chaos Fanatic, Crazy and Deranged Archaeologists, Vorkath, Zulrah, Abyssal Sire, Royal Titans, Hespori, Amoxliatl, the Hueycoatl, Moons of Peril, Galvek and Brutus. Boxes the protection prayer against the boss's last attack in the prayer book (from its attack animation, projectiles aimed at you, or a single-style form). Marks hazards: warning graphics, landing tiles of ground-targeted projectiles (some stay marked after landing, e.g. Vorkath's acid), hazard objects (Zulrah's venom clouds) and hazard NPCs (Moons' threat circles, Royal Titans' area attacks); MOVE! when you stand on one. Each boss can be turned on or off. The IDs are from RuneLite's game data (see `Boss.java`); each boss is unconfirmed until tested in game. |
 
 ## GPU plugin (experimental)
+
+Interface-only scaling: with GPU on, RuneLite's **Stretched Mode** plugin enlarges only the
+interface. The GPU plugin draws the 3D scene at the full screen resolution and the interface
+as a separate layer, scaled with its **UI scaling mode** setting (Nearest Neighbor or xBR for
+crisp pixel art). Without GPU, the game draws the scene and the interface into one picture, so
+stretching blurs both. An earlier attempt (v0.17.0) copied interface pixels from that picture
+instead, and was withdrawn: it also enlarged the scene behind see-through parts of the
+interface.
 
 Turn **GPU** on in the app, start RuneLite, then enable the **GPU** plugin in RuneLite's plugin list.
 

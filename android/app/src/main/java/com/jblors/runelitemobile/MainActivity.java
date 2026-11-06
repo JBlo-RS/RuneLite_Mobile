@@ -43,9 +43,7 @@ public class MainActivity extends Activity {
     private static final int MUTED = 0xFF8C8C8C;
 
     private TextView accountName, accountHint, accountAction;
-    private LinearLayout layoutChoice, sizeChoice, uiScaleChoice, scalingChoice, gpuChoice, more;
-    private static final float[] UI_SCALES = {1f, 1.5f, 2f, 3f};
-    private static final String[] UI_SCALE_NAMES = {"Off", "1.5×", "2×", "3×"};
+    private LinearLayout layoutChoice, sizeChoice, scalingChoice, gpuChoice, more;
     private TextView moreToggle;
 
     @Override
@@ -223,16 +221,6 @@ public class MainActivity extends Activity {
         card.addView(text("Higher is sharper, with smaller buttons and text, and more work for the "
                 + "phone. On a tablet try 900p or 1080p.", 12, MUTED), marginTop(dp(6)));
 
-        card.addView(label("INTERFACE SCALE"), marginTop(dp(16)));
-        uiScaleChoice = segmented(UI_SCALE_NAMES, i -> {
-            prefs().edit().putFloat("uiScale", UI_SCALES[i]).apply();
-            refresh();
-        });
-        card.addView(uiScaleChoice, marginTop(dp(8)));
-        card.addView(text("Enlarges the minimap, inventory and chat with crisp pixels while the game "
-                + "stays sharp. Use with 900p or 1080p. Needs the Mobile Controls plugin (Developer mode).",
-                12, MUTED), marginTop(dp(6)));
-
         card.addView(label("SCALING"), marginTop(dp(16)));
         scalingChoice = segmented(new String[]{"Smooth", "Sharp"}, i -> {
             prefs().edit().putBoolean("sharpScaling", i == 1).apply();
@@ -324,10 +312,6 @@ public class MainActivity extends Activity {
         select(layoutChoice, mobileLayout() ? 0 : 1);
         select(sizeChoice, uiSizeIndex());
         select(scalingChoice, prefs().getBoolean("sharpScaling", false) ? 1 : 0);
-        float uiScale = prefs().getFloat("uiScale", 1f);
-        int uiScaleIdx = 0;
-        for (int i = 0; i < UI_SCALES.length; i++) if (Math.abs(UI_SCALES[i] - uiScale) < 0.01f) uiScaleIdx = i;
-        select(uiScaleChoice, uiScaleIdx);
         select(gpuChoice, gpu() ? 1 : 0);
         Properties creds = JagexCredentials.load(this);
         if (creds == null) {
@@ -346,8 +330,7 @@ public class MainActivity extends Activity {
                 .putExtra(JvmActivity.EXTRA_SCREEN_HEIGHT, UI_SIZES[uiSizeIndex()])
                 .putExtra(JvmActivity.EXTRA_MOBILE_LAYOUT, mobileLayout())
                 .putExtra(JvmActivity.EXTRA_GPU, gpu())
-                .putExtra(JvmActivity.EXTRA_SHARP_SCALING, prefs().getBoolean("sharpScaling", false))
-                .putExtra(JvmActivity.EXTRA_UI_SCALE, prefs().getFloat("uiScale", 1f)));
+                .putExtra(JvmActivity.EXTRA_SHARP_SCALING, prefs().getBoolean("sharpScaling", false)));
     }
 
     private void onAccountAction() {
