@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.10.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.10.1-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -50,8 +50,11 @@ backed by an AAudio stream in `android/app/src/main/cpp/rlm_sound.c` (`librlmsou
 
 - 8/16-bit PCM in either byte order is converted to 16-bit little-endian. AAudio plays the
   line's own sample rate (the game uses 22050 Hz).
-- `available()` is measured against the buffer size the game asked for. The game uses it to
-  decide how far ahead to write.
+- Each line has a ring buffer of exactly the size the game asked for, and AAudio's data callback
+  empties it (playing silence if it runs dry). `available()` and the frame position are counted
+  from that ring, not from AAudio's frame counters. The game closes and reopens a line every few
+  seconds unless it sees the queued amount drop (its `dm` player class), and with AAudio's
+  counters on a blocking stream it didn't see that on a Honor phone.
 - When the output device changes (headphones, Bluetooth), the stream is reopened automatically.
 - The game is muted while the app is in the background.
 - Not supported yet: `Clip` (RuneLite's custom notification sounds).
