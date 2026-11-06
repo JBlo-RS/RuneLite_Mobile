@@ -48,6 +48,19 @@ typedef const unsigned char *(*PFN_glGetString)(unsigned);
 typedef void (*PFN_glClearColor)(float, float, float, float);
 typedef void (*PFN_glClear)(unsigned);
 typedef void (*PFN_glFinish)(void);
+typedef void (*PFN_glGen)(int, unsigned *);
+typedef void (*PFN_glBind)(unsigned, unsigned);
+typedef void (*PFN_glRenderbufferStorage)(unsigned, unsigned, int, int);
+typedef void (*PFN_glFramebufferRenderbuffer)(unsigned, unsigned, unsigned, unsigned);
+typedef unsigned (*PFN_glCheckFramebufferStatus)(unsigned);
+#define GL_RENDERBUFFER         0x8D41
+#define GL_FRAMEBUFFER          0x8D40
+#define GL_COLOR_ATTACHMENT0    0x8CE0
+#define GL_DEPTH_ATTACHMENT     0x8D00
+#define GL_RGBA8                0x8058
+#define GL_DEPTH_COMPONENT24    0x81A6
+#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
+#define GL_DEPTH_BUFFER_BIT     0x0100
 
 static char report[8192];
 
@@ -109,10 +122,47 @@ struct osm {
 };
 
 /** One OpenGL context: report what it is, render a frame, time 120 frames. Returns 1 if OK. */
-static int probe_context(struct osm *o, const char *label, int profile, int major, int minor) {
+/**
+ * What the GPU plugin does: render into its own framebuffer with a colour and a depth buffer.
+ * Each step is printed first, so a crash shows which one.
+ */
+static void probe_fbo(struct osm *o, const char *label) {
+    PFN_glGen genRb = (PFN_glGen) o->proc("glGenRenderbuffers"), genFb = (PFN_glGen) o->proc("glGenFramebuffers");
+    PFN_glBind bindRb = (PFN_glBind) o->proc("glBindRenderbuffer"), bindFb = (PFN_glBind) o->proc("glBindFramebuffer");
+    PFN_glRenderbufferStorage storage = (PFN_glRenderbufferStorage) o->proc("glRenderbufferStorage");
+    PFN_glFramebufferRenderbuffer attach = (PFN_glFramebufferRenderbuffer) o->proc("glFramebufferRenderbuffer");
+    PFN_glCheckFramebufferStatus status = (PFN_glCheckFramebufferStatus) o->proc("glCheckFramebufferStatus");
+    PFN_glClear clear = (PFN_glClear) o->proc("glClear");
+    PFN_glFinish finish = (PFN_glFinish) o->proc("glFinish");
+    if (!genRb || !genFb || !bindRb || !bindFb || !storage || !attach || !status) {
+        out("[%s] framebuffer functions missing", label);
+        return;
+    }
+    unsigned rb[2], fb;
+    genRb(2, rb);
+    genFb(1, &fb);
+    bindFb(GL_FRAMEBUFFER, fb);
+    STEP("[%s] framebuffer: colour buffer", label);
+    bindRb(GL_RENDERBUFFER, rb[0]);
+    storage(GL_RENDERBUFFER, GL_RGBA8, 1280, 720);
+    attach(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rb[0]);
+    STEP("[%s] framebuffer: depth buffer", label);
+    bindRb(GL_RENDERBUFFER, rb[1]);
+    storage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 1280, 720);
+    attach(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rb[1]);
+    STEP("[%s] framebuffer: draw", label);
+    unsigned st = status(GL_FRAMEBUFFER);
+    clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    finish();
+    out("[%s] framebuffer with colour + depth: %s", label,
+        st == GL_FRAMEBUFFER_COMPLETE ? "OK (what the GPU plugin needs)" : "incomplete");
+    bindFb(GL_FRAMEBUFFER, 0);
+}
+
+static int probe_context(struct osm *o, const char *label, int profile, int major, int minor, int depth) {
     int attribs[16], n = 0;
     attribs[n++] = OSMESA_FORMAT; attribs[n++] = GL_RGBA;
-    attribs[n++] = OSMESA_DEPTH_BITS; attribs[n++] = 24;
+    attribs[n++] = OSMESA_DEPTH_BITS; attribs[n++] = depth;
     if (profile) {
         attribs[n++] = OSMESA_PROFILE; attribs[n++] = profile;
         attribs[n++] = OSMESA_CONTEXT_MAJOR_VERSION; attribs[n++] = major;
@@ -159,6 +209,7 @@ static int probe_context(struct osm *o, const char *label, int profile, int majo
     }
     double ms = (now_ms() - t0) / 120;
     out("[%s] 1280x720 clear + read back: %.2f ms per frame (%.0f fps max)", label, ms, ms > 0 ? 1000 / ms : 0);
+    if (profile) probe_fbo(o, label);
 
     o->make_current(NULL, NULL, 0, 0, 0);
     o->destroy(ctx);
@@ -184,7 +235,7 @@ Java_com_jblors_runelitemobile_GpuProbe_run(JNIEnv *env, jclass clazz, jstring o
     snprintf(ptr, sizeof(ptr), "%" PRIxPTR, (uintptr_t) libvulkan);
     setenv("VULKAN_PTR", ptr, 1);
     setenv("GALLIUM_DRIVER", "zink", 1);
-    setenv("MESA_GLSL_CACHE_DISABLE", "true", 1);
+    setenv("MESA_SHADER_CACHE_DISABLE", "true", 1);
 
     const char *path = (*env)->GetStringUTFChars(env, osmesaPath, NULL);
     STEP("dlopen %s", path);
@@ -205,13 +256,16 @@ Java_com_jblors_runelitemobile_GpuProbe_run(JNIEnv *env, jclass clazz, jstring o
         return (*env)->NewStringUTF(env, report);
     }
 
-    int compat = probe_context(&o, "default", 0, 0, 0);
-    int core33 = probe_context(&o, "core 3.3", OSMESA_CORE_PROFILE, 3, 3);
-    int core45 = probe_context(&o, "core 4.5", OSMESA_CORE_PROFILE, 4, 5);
-
+    // Without a depth buffer first: on Adreno, Zink 23.0 aborts making one for the window
+    // (depth memory there is "lazily allocated"); RuneLite's GPU plugin doesn't need it, since it
+    // draws into its own framebuffers. The context with depth is tried last, as it may crash.
+    int compat = probe_context(&o, "default, no depth", 0, 0, 0, 0);
+    int core33 = probe_context(&o, "core 3.3, no depth", OSMESA_CORE_PROFILE, 3, 3, 0);
+    int core45 = probe_context(&o, "core 4.5, no depth", OSMESA_CORE_PROFILE, 4, 5, 0);
     out("RESULT: %s", core33 ? "OpenGL 3.3 core works: the GPU plugin is feasible on this phone"
             : compat ? "OpenGL works, but not 3.3 core: the GPU plugin would not start as-is"
             : "Zink did not give a working OpenGL context on this phone");
     if (core45) out("        OpenGL 4.5 core also works (RuneLite uses some 4.5 features when present)");
+    probe_context(&o, "default, depth 24", 0, 0, 0, 24);
     return (*env)->NewStringUTF(env, report);
 }

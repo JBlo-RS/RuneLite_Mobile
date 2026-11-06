@@ -164,8 +164,12 @@ Java_net_runelite_rlawt_AWTContext_createGLContext0(JNIEnv *env, jclass cls, jlo
     for (size_t i = 0; i < sizeof(versions) / sizeof(versions[0]) && !c->gl; i++) {
         int a[16], n = 0;
         a[n++] = OSMESA_FORMAT; a[n++] = GL_RGBA;
-        a[n++] = OSMESA_DEPTH_BITS; a[n++] = depth;
-        a[n++] = OSMESA_STENCIL_BITS; a[n++] = stencil;
+        // No depth or stencil buffer on the window: RuneLite's GPU plugin draws into its own
+        // framebuffers, and on Adreno Zink 23.0 aborts allocating a window depth buffer
+        (void) depth;
+        (void) stencil;
+        a[n++] = OSMESA_DEPTH_BITS; a[n++] = 0;
+        a[n++] = OSMESA_STENCIL_BITS; a[n++] = 0;
         if (versions[i][0]) {
             a[n++] = OSMESA_PROFILE; a[n++] = versions[i][0];
             a[n++] = OSMESA_CONTEXT_MAJOR_VERSION; a[n++] = versions[i][1];
