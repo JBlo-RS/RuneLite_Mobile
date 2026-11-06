@@ -29,6 +29,7 @@ import java.util.Properties;
 /** Launch screen: play, account, settings, and the developer/test tools under "More". */
 public class MainActivity extends Activity {
     private static final int REQ_IMPORT_CREDENTIALS = 1;
+    private static final int REQ_IMPORT_PLUGIN = 2;
     private static final int[] UI_SIZES = {720, 630, 540};
     private static final String[] UI_SIZE_NAMES = {"Small", "Medium", "Large"};
 
@@ -185,8 +186,10 @@ public class MainActivity extends Activity {
         more = new LinearLayout(this);
         more.setOrientation(LinearLayout.VERTICAL);
         more.setVisibility(View.GONE);
-        more.addView(moreItem("Developer mode", "Start the client without the launcher, with --developer-mode",
-                v -> launch(JvmActivity.MODE_RUNELITE_DEV)));
+        more.addView(moreItem("Developer mode", "Start the client without the launcher, with "
+                + "--developer-mode. Loads your local plugins.", v -> launch(JvmActivity.MODE_RUNELITE_DEV)));
+        more.addView(moreItem("Plugins", "Local plugins for Developer mode: import a .jar or remove one",
+                v -> showPlugins()));
         more.addView(moreItem("View log", "Output of the last run", v -> showLog()));
         more.addView(moreItem("Share log", "Send the last run's log", v -> shareLog()));
         more.addView(moreItem("Swing demo", "Test touch, keyboard and drawing", v -> launch(JvmActivity.MODE_SWING_DEMO)));
@@ -293,7 +296,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_IMPORT_CREDENTIALS || resultCode != RESULT_OK || data == null) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode == REQ_IMPORT_PLUGIN) {
+            String error = LocalPlugins.importJar(this, data.getData());
+            Toast.makeText(this, error == null ? "Plugin imported. Start Developer mode to use it." : error,
+                    Toast.LENGTH_LONG).show();
+            if (error == null) showPlugins();
+            return;
+        }
+        if (requestCode != REQ_IMPORT_CREDENTIALS) return;
         try (InputStream in = getContentResolver().openInputStream(data.getData())) {
             String error = JagexCredentials.importFrom(this, in);
             Toast.makeText(this, error == null ? "Jagex account imported" : error, Toast.LENGTH_LONG).show();
@@ -301,6 +312,52 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Could not read file: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
         refresh();
+    }
+
+    // ------------------------------------------------------------ plugins
+
+    private void showPlugins() {
+        try {
+            LocalPlugins.installBuiltIn(this);
+        } catch (IOException e) {
+            Toast.makeText(this, "Could not install built-in plugins: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+        java.util.List<String> builtIn = LocalPlugins.builtIn(this);
+        java.util.List<String> names = LocalPlugins.installed(this);
+        String[] rows = new String[names.size()];
+        for (int i = 0; i < rows.length; i++) {
+            rows[i] = names.get(i) + (builtIn.contains(names.get(i)) ? "  (built in)" : "");
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle("Local plugins")
+                .setPositiveButton("Import .jar", (d, w) -> startActivityForResult(
+                        new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*"), REQ_IMPORT_PLUGIN))
+                .setNegativeButton("Close", null);
+        if (rows.length == 0) {
+            b.setMessage("No local plugins yet.");
+        } else {
+            b.setItems(rows, (d, i) -> {
+                String name = names.get(i);
+                if (builtIn.contains(name)) {
+                    new AlertDialog.Builder(this).setTitle(name)
+                            .setMessage("This plugin comes with the app. Turn it off in RuneLite's plugin "
+                                    + "list if you don't want it.")
+                            .setPositiveButton("OK", (d2, w2) -> showPlugins())
+                            .show();
+                    return;
+                }
+                new AlertDialog.Builder(this).setTitle("Remove " + name + "?")
+                        .setPositiveButton("Remove", (d2, w2) -> {
+                            LocalPlugins.remove(this, name);
+                            showPlugins();
+                        })
+                        .setNegativeButton("Keep", (d2, w2) -> showPlugins())
+                        .show();
+            });
+        }
+        b.show();
     }
 
     // ------------------------------------------------------------ log

@@ -745,6 +745,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 if (MODE_RUNELITE_DEV.equals(mode)) {
                     args.addAll(Arrays.asList(RUNELITE_JVM_ARGS));
                     args.add("-ea"); // RuneLite refuses developer mode without assertions
+                    LocalPlugins.installBuiltIn(this);
+                    append("plugins: " + LocalPlugins.installed(this));
                     applyJagexCredentials();
                     writeDevCredentialsFile();
                     args.add("com.jblors.rlm.DevLaunch"); // on the boot class path (jvmhelper)
