@@ -87,7 +87,34 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        checkGpuCrash();
         refresh();
+    }
+
+    /**
+     * If the last run crashed in the OpenGL driver (Mesa/Zink aborts with an assertion on some
+     * phones' Vulkan drivers), turn the GPU setting off and say so, once per crash.
+     */
+    private void checkGpuCrash() {
+        if (!gpu()) return;
+        File log = JvmActivity.logFile(this);
+        if (!log.isFile() || log.lastModified() == prefs().getLong("gpuCrashSeen", 0)) return;
+        String text = readLog();
+        int tail = Math.max(0, text.length() - 20000);
+        String end = text.substring(tail);
+        boolean mesaAbort = end.contains("src/gallium/") || end.contains("src/vulkan/") || end.contains("zink_")
+                && end.contains("assertion");
+        if (!mesaAbort) return;
+        prefs().edit().putBoolean("gpu", false).putLong("gpuCrashSeen", log.lastModified()).apply();
+        String line = "";
+        for (String l : end.split("\n")) if (l.contains("assertion") || l.contains("src/gallium/")) line = l.trim();
+        new AlertDialog.Builder(this)
+                .setTitle("GPU turned off")
+                .setMessage("The last start crashed in the GPU driver (Zink, OpenGL on this device's Vulkan "
+                        + "driver), so GPU has been turned off. RuneLite works as before without it.\n\n"
+                        + "This build of Zink doesn't work with some GPUs yet, e.g. Qualcomm Adreno.\n\n" + line)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     // ------------------------------------------------------------ sections

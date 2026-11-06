@@ -10,6 +10,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Projectile;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GraphicsObjectCreated;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.GameObject;
 import net.runelite.api.coords.LocalPoint;
@@ -106,9 +107,84 @@ public class BossHelperPlugin extends Plugin
 		return b != null && config.enabled(b) ? b : null;
 	}
 
+	// ------------------------------------------------------------ debug log
+
+	private final Set<Projectile> seenProjectiles = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+	private int debugLines;
+
+	/** True for things close enough to the player to be part of a fight. */
+	private boolean near(net.runelite.api.coords.WorldPoint p)
+	{
+		Player me = client.getLocalPlayer();
+		return me != null && p != null && me.getWorldLocation().distanceTo(p) <= 20;
+	}
+
+	private void debug(String what)
+	{
+		if (config.debugLog() && debugLines++ < 60) // at most 60 lines a tick
+		{
+			System.out.println("rlm-boss: t" + client.getTickCount() + " " + what);
+		}
+	}
+
+	private static String describe(Actor a)
+	{
+		if (a == null)
+		{
+			return "-";
+		}
+		if (a instanceof NPC)
+		{
+			return "npc " + ((NPC) a).getId() + " '" + a.getName() + "'";
+		}
+		return a == null ? "-" : "player '" + a.getName() + "'";
+	}
+
+	@Subscribe
+	public void onGraphicsObjectCreated(GraphicsObjectCreated e)
+	{
+		if (config.debugLog() && e.getGraphicsObject().getLocation() != null)
+		{
+			net.runelite.api.coords.WorldPoint w = net.runelite.api.coords.WorldPoint.fromLocal(client, e.getGraphicsObject().getLocation());
+			if (near(w))
+			{
+				debug("graphics " + e.getGraphicsObject().getId() + " at " + w);
+			}
+		}
+	}
+
+	private void debugTick()
+	{
+		debugLines = 0;
+		if (!config.debugLog())
+		{
+			return;
+		}
+		Player me = client.getLocalPlayer();
+		for (Projectile p : client.getProjectiles())
+		{
+			if (seenProjectiles.add(p))
+			{
+				Actor src = p.getSourceActor();
+				if (src != null && src != me && near(src.getWorldLocation()) || p.getTargetActor() == me)
+				{
+					debug("projectile " + p.getId() + " from " + describe(src) + " to "
+						+ (p.getTargetActor() == me ? "you" : p.getTargetActor() != null ? describe(p.getTargetActor())
+						: "ground " + p.getTargetPoint()));
+				}
+			}
+		}
+	}
+
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged e)
 	{
+		if (config.debugLog() && e.getActor() instanceof NPC && e.getActor().getAnimation() != -1
+			&& near(e.getActor().getWorldLocation()))
+		{
+			debug(describe(e.getActor()) + " animation " + e.getActor().getAnimation()
+				+ (e.getActor().getInteracting() == client.getLocalPlayer() ? " (targeting you)" : ""));
+		}
 		Boss b = bossOf(e.getActor());
 		if (b == null)
 		{
@@ -124,12 +200,20 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcChanged(NpcChanged e)
 	{
+		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
+		{
+			debug("changed to " + describe(e.getNpc()));
+		}
 		formChange(e.getNpc());
 	}
 
 	@Subscribe
 	public void onNpcSpawned(NpcSpawned e)
 	{
+		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
+		{
+			debug("spawned " + describe(e.getNpc()) + " at " + e.getNpc().getWorldLocation());
+		}
 		formChange(e.getNpc());
 	}
 
@@ -167,6 +251,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick e)
 	{
+		debugTick();
 		Player me = client.getLocalPlayer();
 		boolean present = false;
 		for (NPC npc : client.getTopLevelWorldView().npcs())

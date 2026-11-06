@@ -86,7 +86,7 @@ enum Boss
 		.projectile(RANGED, 1489).projectile(MAGIC, 1490) // GALVEK_RANGED_TRAVEL, _MAGIC_TRAVEL
 		.groundAll()), // GALVEK_AREA_TRAVEL and the elemental specials
 
-	BRUTUS("Brutus", npcs(15626) // COWBOSS
+	BRUTUS("Brutus", npcs(15625, 15626) // COWBOSS_UNNAMED, COWBOSS
 		.anim(MELEE, 13783) // COW_BOSS_ATTACK
 		.projectile(RANGED, 3591).projectile(MELEE, 3592).projectile(MAGIC, 3593)); // VFX_COWBOSS_HM_*_01
 

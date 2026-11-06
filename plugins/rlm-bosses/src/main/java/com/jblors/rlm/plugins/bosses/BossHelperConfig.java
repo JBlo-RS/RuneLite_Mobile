@@ -19,6 +19,15 @@ public interface BossHelperConfig extends Config
 	@ConfigSection(name = "Bosses", description = "Which bosses to help with", position = 20)
 	String bosses = "bosses";
 
+	@ConfigSection(name = "Debug", description = "For fixing a boss that doesn't work", position = 30, closedByDefault = true)
+	String debug = "debug";
+
+	@ConfigItem(keyName = "debugLog", name = "Record fight details", description = "Write nearby NPCs' animations, projectiles and ground effects to the app log (Share log). Turn on, fight, then share the log.", section = debug, position = 31)
+	default boolean debugLog()
+	{
+		return false;
+	}
+
 	@ConfigItem(keyName = "prayerBook", name = "Box in prayer book", description = "Box the prayer to use in the prayer tab", section = prayer, position = 1)
 	default boolean prayerBook()
 	{
