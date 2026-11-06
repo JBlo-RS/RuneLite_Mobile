@@ -41,10 +41,16 @@ final class LocalPlugins {
         }
     }
 
+    /** Built-in plugins that were replaced: removed from the side-load folder. */
+    private static final String[] RETIRED = {
+            "scurrius-bricks.jar", // now part of the Boss Helper (rlm-bosses.jar)
+    };
+
     /** Copies (updates) the built-in plugins into the side-load folder. */
     static void installBuiltIn(Context ctx) throws IOException {
         File d = dir(ctx);
         d.mkdirs();
+        for (String n : RETIRED) new File(d, n).delete();
         for (String n : builtIn(ctx)) JreInstaller.copyAsset(ctx, "plugins/" + n, new File(d, n));
     }
 

@@ -1,4 +1,4 @@
-package com.jblors.rlm.plugins.scurrius;
+package com.jblors.rlm.plugins.bosses;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -16,28 +16,26 @@ import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.util.Text;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.util.Text;
 
-/**
- * Shows the prayer against Scurrius' last attack: a box around it in the prayer book, and its
- * icon above your character. Green while that prayer is on, red while it isn't.
- */
-class PrayerOverlay extends Overlay
+/** Boxes the prayer to use in the prayer book (green while on, red while not). */
+class BossPrayerOverlay extends Overlay
 {
-	static final Color ON = new Color(40, 220, 60);
-	static final Color OFF = new Color(255, 40, 40);
+	private static final Color ON = new Color(40, 220, 60), OFF = new Color(255, 40, 40);
+	private static final int FIRST_BUTTON = InterfaceID.Prayerbook.PRAYER1, MAX_BUTTONS = 64;
 
 	private final Client client;
-	private final ScurriusBricksPlugin plugin;
-	private final ScurriusBricksConfig config;
+	private final BossHelperPlugin plugin;
+	private final BossHelperConfig config;
 	private final SpriteManager spriteManager;
+	private final int[] buttonCache = new int[Style.values().length];
 
 	@Inject
-	PrayerOverlay(Client client, ScurriusBricksPlugin plugin, ScurriusBricksConfig config, SpriteManager spriteManager)
+	BossPrayerOverlay(Client client, BossHelperPlugin plugin, BossHelperConfig config, SpriteManager spriteManager)
 	{
 		this.client = client;
 		this.plugin = plugin;
@@ -51,7 +49,7 @@ class PrayerOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		AttackStyle style = plugin.getNextStyle();
+		Style style = plugin.getStyle();
 		if (style == null)
 		{
 			return null;
@@ -62,8 +60,7 @@ class PrayerOverlay extends Overlay
 			return null;
 		}
 		Color color = on ? ON : OFF;
-
-		if (config.prayerHighlightBook())
+		if (config.prayerBook())
 		{
 			Widget w = prayerButton(style);
 			if (w != null && !w.isHidden())
@@ -76,42 +73,27 @@ class PrayerOverlay extends Overlay
 				g.draw(b);
 			}
 		}
-
-		if (config.prayerIconOverPlayer())
+		if (config.prayerIcon())
 		{
 			Player me = client.getLocalPlayer();
 			BufferedImage icon = spriteManager.getSprite(style.sprite, 0);
-			if (me != null && icon != null)
+			Point p = me == null || icon == null ? null : me.getCanvasImageLocation(icon, me.getLogicalHeight() + 70);
+			if (p != null)
 			{
-				Point p = me.getCanvasImageLocation(icon, me.getLogicalHeight() + 70);
-				if (p != null)
-				{
-					int pad = 4;
-					Rectangle box = new Rectangle(p.getX() - pad, p.getY() - pad,
-						icon.getWidth() + pad * 2, icon.getHeight() + pad * 2);
-					g.setColor(new Color(0, 0, 0, 150));
-					g.fill(box);
-					g.setColor(color);
-					g.setStroke(new BasicStroke(2));
-					g.draw(box);
-					g.drawImage(icon, p.getX(), p.getY(), null);
-				}
+				Rectangle box = new Rectangle(p.getX() - 4, p.getY() - 4, icon.getWidth() + 8, icon.getHeight() + 8);
+				g.setColor(new Color(0, 0, 0, 150));
+				g.fill(box);
+				g.setColor(color);
+				g.setStroke(new BasicStroke(2));
+				g.draw(box);
+				g.drawImage(icon, p.getX(), p.getY(), null);
 			}
 		}
 		return null;
 	}
 
-	/** Components of the prayer book that can hold prayer buttons (PRAYER1 onwards). */
-	private static final int FIRST_BUTTON = InterfaceID.Prayerbook.PRAYER1, MAX_BUTTONS = 64;
-
-	private final int[] buttonCache = new int[AttackStyle.values().length];
-
-	/**
-	 * The prayer book button for a style's prayer, found by name. The component numbers don't
-	 * follow the book's order (each prayer's component comes from the game's data, and new
-	 * prayers were added over time), and the book can be rearranged.
-	 */
-	private Widget prayerButton(AttackStyle style)
+	/** The prayer's button: from the game's prayer list (as RuneLite's prayer plugin), else by name. */
+	private Widget prayerButton(Style style)
 	{
 		int cached = buttonCache[style.ordinal()];
 		if (cached != 0)
@@ -123,15 +105,13 @@ class PrayerOverlay extends Overlay
 			}
 			buttonCache[style.ordinal()] = 0;
 		}
-		// 1. The game's prayer list, as RuneLite's prayer plugin uses it: each prayer is an item
-		//    definition whose OC_PRAYER_COMPONENT param is its button in the prayer book
 		EnumComposition prayers = client.getEnum(EnumID.PRAYERS_NORMAL);
 		if (prayers != null)
 		{
 			for (int obj : prayers.getIntVals())
 			{
 				ItemComposition def = client.getItemDefinition(obj);
-				if (def == null || !style.name.equalsIgnoreCase(Text.removeTags(def.getName()).trim()))
+				if (def == null || !style.prayerName.equalsIgnoreCase(Text.removeTags(def.getName()).trim()))
 				{
 					continue;
 				}
@@ -144,11 +124,10 @@ class PrayerOverlay extends Overlay
 				}
 			}
 		}
-		// 2. Fallback: a button in the prayer book with the prayer's name
 		for (int id = FIRST_BUTTON; id < FIRST_BUTTON + MAX_BUTTONS; id++)
 		{
 			Widget w = client.getWidget(id);
-			if (w != null && w.getName() != null && style.name.equalsIgnoreCase(Text.removeTags(w.getName()).trim()))
+			if (w != null && w.getName() != null && style.prayerName.equalsIgnoreCase(Text.removeTags(w.getName()).trim()))
 			{
 				buttonCache[style.ordinal()] = id;
 				return w;

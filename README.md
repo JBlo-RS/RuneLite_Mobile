@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.11.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.12.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -75,7 +75,7 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 | --- | --- |
 | Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). |
 | Big Status Bars (`plugins/rlm-mobile`) | Large Hitpoints and Prayer bars, optionally special attack and run energy; HP turns green when poisoned and dark green when envenomed, and HP and Prayer flash below set thresholds. Movable (hold Alt and drag). |
-| Scurrius Helper (`plugins/scurrius-bricks`) | Marks the tiles where Scurrius' falling bricks (spot animation 2644) are about to land, and shows MOVE! if you are standing on one. Shows the protection prayer against his last attack (from his attack animation): a box around it in the prayer book (optionally also its icon above your character), green while it's on and red while it isn't. Everything can be changed in its settings. |
+| Boss Helper (`plugins/rlm-bosses`) | For Scurrius, TzTok-Jad / JalTok-Jad, Dagannoth Kings, Phantom Muspah, Sarachnis, Chaos Fanatic, and the Crazy and Deranged Archaeologists: boxes the protection prayer against the boss's last attack in the prayer book (from its attack animation, projectiles aimed at you, or its form), and marks tiles about to be hit (warning graphics, ground-targeted projectiles) with MOVE! when you stand on one. Each boss can be turned on or off. The IDs are from RuneLite's game data (see `Boss.java`); each boss is unconfirmed until tested in game. |
 
 ## GPU plugin (experimental)
 
