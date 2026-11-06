@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.16.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.17.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -73,7 +73,7 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 
 | Plugin | What it does |
 | --- | --- |
-| Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). |
+| Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). In resizable layouts, it also tells the app where the minimap, side panel and chatbox are (`rlm.ui.regions`), for the app's Interface scale setting: the app (`UiMagnifier`) draws those panels enlarged with nearest-neighbour pixels, anchored to their corners, and maps taps back. Nothing is enlarged while a right-click menu or a main interface such as the bank is open. |
 | Big Status Bars (`plugins/rlm-mobile`) | Large Hitpoints and Prayer bars, optionally special attack and run energy; HP turns green when poisoned and dark green when envenomed, and HP and Prayer flash below set thresholds. Movable (hold Alt and drag). |
 | Big Menu (`plugins/rlm-mobile`) | Draws the right-click menu large (row height, text size and width can be set) over the game's own menu, with the game's colours. A RuneLite mouse listener moves taps and cursor movement inside it to the matching row of the game's menu (19 px header, 15 px rows, newest entry on top), like stretched mode scales clicks: one tap, one click. |
 | Skilling Helper (`plugins/rlm-skilling`) | Remembers the last tree, rock or fishing spot you used. While you're idle, it outlines the nearest one of that kind (rocks by object ID, trees by name and their chop option, fishing spots by NPC ID). With a full inventory it outlines the nearest bank booth, bank chest, deposit box or banker instead. It only highlights. |
