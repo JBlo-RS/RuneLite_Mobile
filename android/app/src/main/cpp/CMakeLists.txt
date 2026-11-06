@@ -25,7 +25,11 @@ target_link_libraries(rlmgpu log dl)
 add_library(rlmgl SHARED rlm_gl.c)
 target_link_libraries(rlmgl log dl)
 
-foreach(t rlm pojavexec_awt awt_xawt rlmgpu rlmgl)
+# Sound output for the JVM (com.jblors.rlm.sound, AAudio); see rlm_sound.c
+add_library(rlmsound SHARED rlm_sound.c)
+target_link_libraries(rlmsound aaudio log)
+
+foreach(t rlm pojavexec_awt awt_xawt rlmgpu rlmgl rlmsound)
     target_compile_options(${t} PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # 16 KB page alignment (also set via ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES)
     target_link_options(${t} PRIVATE -Wl,-z,max-page-size=16384)

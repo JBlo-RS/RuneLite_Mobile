@@ -65,6 +65,9 @@ final class JvmLauncher {
         argv.add("-Djdk.lang.Process.launchMechanism=FORK");
         argv.add("-Dos.version=Android-" + android.os.Build.VERSION.RELEASE);
         argv.add("-Duser.timezone=" + java.util.TimeZone.getDefault().getID());
+        // Sound: the JRE has no Java Sound backend on Android; ours plays through AAudio
+        argv.add("-Drlm.sound.lib=" + new File(nativeDir, "librlmsound.so").getAbsolutePath());
+        argv.add("-Djavax.sound.sampled.SourceDataLine=com.jblors.rlm.sound.AndroidMixerProvider");
         argv.addAll(appArgs);
 
         log.line("argv: " + String.join("\n    ", argv));

@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.9.3-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.10.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -40,6 +40,21 @@ The probe tests JIT, threads, zip, font rendering (freetype) and HTTPS
 (`static.runelite.net`). A good run ends with `ALL CHECKS PASSED`.
 
 Every APK is signed with `android/debug.keystore`, so new builds install over old ones.
+
+## Sound
+
+The JRE has no Java Sound backend on Android: it would use ALSA, so the game found no audio
+device and stayed silent. `com.jblors.rlm.sound` (in the helper jar, registered as a
+`javax.sound.sampled.spi.MixerProvider`) adds an output `SourceDataLine` for the game. It is
+backed by an AAudio stream in `android/app/src/main/cpp/rlm_sound.c` (`librlmsound.so`).
+
+- 8/16-bit PCM in either byte order is converted to 16-bit little-endian. AAudio plays the
+  line's own sample rate (the game uses 22050 Hz).
+- `available()` is measured against the buffer size the game asked for. The game uses it to
+  decide how far ahead to write.
+- When the output device changes (headphones, Bluetooth), the stream is reopened automatically.
+- The game is muted while the app is in the background.
+- Not supported yet: `Clip` (RuneLite's custom notification sounds).
 
 ## Local plugins
 

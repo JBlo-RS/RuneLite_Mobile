@@ -791,6 +791,19 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        Sound.setMuted(false);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // The JVM keeps running in the background; keep the game quiet there
+        Sound.setMuted(true);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         rendering = false;
