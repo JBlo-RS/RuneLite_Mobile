@@ -1,26 +1,25 @@
 package com.jblors.rlm.plugins.scurrius;
 
 import net.runelite.api.Prayer;
-import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.SpriteID;
 
 /** Scurrius' attack styles and the prayer that blocks each. */
 enum AttackStyle
 {
-	MELEE(Prayer.PROTECT_FROM_MELEE, InterfaceID.Prayerbook.PRAYER19, SpriteID.Prayeron.PROTECT_FROM_MELEE),
-	RANGED(Prayer.PROTECT_FROM_MISSILES, InterfaceID.Prayerbook.PRAYER18, SpriteID.Prayeron.PROTECT_FROM_MISSILES),
-	MAGIC(Prayer.PROTECT_FROM_MAGIC, InterfaceID.Prayerbook.PRAYER17, SpriteID.Prayeron.PROTECT_FROM_MAGIC);
+	MELEE(Prayer.PROTECT_FROM_MELEE, "Protect from Melee", SpriteID.Prayeron.PROTECT_FROM_MELEE),
+	RANGED(Prayer.PROTECT_FROM_MISSILES, "Protect from Missiles", SpriteID.Prayeron.PROTECT_FROM_MISSILES),
+	MAGIC(Prayer.PROTECT_FROM_MAGIC, "Protect from Magic", SpriteID.Prayeron.PROTECT_FROM_MAGIC);
 
 	final Prayer prayer;
-	/** The prayer's button in the prayer book */
-	final int widget;
+	/** The prayer's name, as on its button in the prayer book */
+	final String name;
 	/** The prayer's icon (sprite archive, file 0) */
 	final int sprite;
 
-	AttackStyle(Prayer prayer, int widget, int sprite)
+	AttackStyle(Prayer prayer, String name, int sprite)
 	{
 		this.prayer = prayer;
-		this.widget = widget;
+		this.name = name;
 		this.sprite = sprite;
 	}
 

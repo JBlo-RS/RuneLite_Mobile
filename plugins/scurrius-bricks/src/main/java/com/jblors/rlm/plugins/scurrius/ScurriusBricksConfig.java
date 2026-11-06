@@ -103,15 +103,15 @@ public interface ScurriusBricksConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "prayerOverPlayer",
+		keyName = "prayerIconOverPlayer",
 		name = "Icon over character",
-		description = "Show the prayer's icon above your character",
+		description = "Also show the prayer's icon above your character",
 		section = prayer,
 		position = 13
 	)
-	default boolean prayerOverPlayer()
+	default boolean prayerIconOverPlayer()
 	{
-		return true;
+		return false;
 	}
 
 	@ConfigItem(

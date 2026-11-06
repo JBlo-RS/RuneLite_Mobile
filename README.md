@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.9.2-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.9.3-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -55,7 +55,7 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 
 | Plugin | What it does |
 | --- | --- |
-| Scurrius Helper (`plugins/scurrius-bricks`) | Marks the tiles where Scurrius' falling bricks (spot animation 2644) are about to land, and shows MOVE! if you are standing on one. Shows the protection prayer against his last attack (from his attack animation): a box around it in the prayer book and its icon above your character, green while it's on and red while it isn't. Everything can be changed in its settings. |
+| Scurrius Helper (`plugins/scurrius-bricks`) | Marks the tiles where Scurrius' falling bricks (spot animation 2644) are about to land, and shows MOVE! if you are standing on one. Shows the protection prayer against his last attack (from his attack animation): a box around it in the prayer book (optionally also its icon above your character), green while it's on and red while it isn't. Everything can be changed in its settings. |
 
 ## GPU plugin (experimental)
 
