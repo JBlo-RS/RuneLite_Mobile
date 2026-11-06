@@ -18,18 +18,22 @@ add_library(awt_xawt SHARED xawt_stub.c)
 target_link_libraries(awt_xawt "-Wl,--no-as-needed" awt_headless)
 
 # GPU feasibility test (Zink via OSMesa); see gpu_probe.c
-add_library(rlmgpu SHARED gpu_probe.c)
+add_library(rlmgpu SHARED gpu_probe.c vk_turnip.c)
 target_link_libraries(rlmgpu log dl)
 
 # OpenGL for RuneLite's GPU plugin (natives of net.runelite.rlawt.AWTContext); see rlm_gl.c
-add_library(rlmgl SHARED rlm_gl.c)
+add_library(rlmgl SHARED rlm_gl.c vk_turnip.c)
 target_link_libraries(rlmgl log dl)
 
 # Sound output for the JVM (com.jblors.rlm.sound, AAudio); see rlm_sound.c
 add_library(rlmsound SHARED rlm_sound.c)
 target_link_libraries(rlmsound aaudio log)
 
-foreach(t rlm pojavexec_awt awt_xawt rlmgpu rlmgl rlmsound)
+# Stand-ins for Turnip's non-public dependencies (see vk_turnip.c); named like the real ones
+add_library(cutils SHARED cutils_stub.c)
+add_library(hardware SHARED hardware_stub.c)
+
+foreach(t rlm pojavexec_awt awt_xawt rlmgpu rlmgl rlmsound cutils hardware)
     target_compile_options(${t} PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # 16 KB page alignment (also set via ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES)
     target_link_options(${t} PRIVATE -Wl,-z,max-page-size=16384)

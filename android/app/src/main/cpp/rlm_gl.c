@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "vk_turnip.h"
+
 #define TAG "rlm-gl"
 #define LOG(...) do { __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__); \
     printf("rlm-gl: " __VA_ARGS__); printf("\n"); fflush(stdout); } while (0)
@@ -74,7 +76,7 @@ static jstring err(JNIEnv *env, const char *fmt, const char *arg) {
 }
 
 /** Loads OSMesa once, pointing Pojav's Mesa build at the system Vulkan loader. */
-static const char *load_osmesa(const char *path) {
+static const char *load_osmesa(const char *path, const char *turnipPath) {
     static int loaded;
     static char failure[512];
     if (loaded) return failure[0] ? failure : NULL;
@@ -84,6 +86,26 @@ static const char *load_osmesa(const char *path) {
         snprintf(failure, sizeof(failure), "Vulkan not available: %s", dlerror());
         return failure;
     }
+#ifndef RLM_GL_DESKTOP_TEST
+    // On Qualcomm GPUs, Zink 23.0 aborts on the phone's own Vulkan driver: use Turnip (vk_turnip.c)
+    PFN_vkGetInstanceProcAddr sys = (PFN_vkGetInstanceProcAddr) dlsym(vk, "vkGetInstanceProcAddr");
+    char dev[256] = "";
+    uint32_t vendor = sys ? vk_first_device(sys, dev, sizeof(dev), NULL, NULL, 0) : 0;
+    if (vendor == VENDOR_QUALCOMM) {
+        const char *terr = turnipPath ? turnip_load(turnipPath) : "no Turnip path (-Drlm.gl.turnip)";
+        if (terr) {
+            snprintf(failure, sizeof(failure), "Qualcomm GPU (%s) needs Turnip, which failed: %s", dev, terr);
+            return failure;
+        }
+        char tdev[256] = "";
+        uint32_t api = 0;
+        vk_first_device(turnip_gipa(), tdev, sizeof(tdev), &api, NULL, 0);
+        LOG("Vulkan: Turnip (%s, Vulkan %u.%u) instead of %s", tdev, VK_VERSION_MAJOR(api), VK_VERSION_MINOR(api), dev);
+        vk = turnip_handle();
+    } else {
+        LOG("Vulkan: %s", dev);
+    }
+#endif
     char ptr[32];
     snprintf(ptr, sizeof(ptr), "%" PRIxPTR, (uintptr_t) vk);
     setenv("VULKAN_PTR", ptr, 1);
@@ -150,11 +172,13 @@ Java_net_runelite_rlawt_AWTContext_destroy0(JNIEnv *env, jclass cls, jlong insta
 
 JNIEXPORT jstring JNICALL
 Java_net_runelite_rlawt_AWTContext_createGLContext0(JNIEnv *env, jclass cls, jlong instance, jstring osmesaPath,
-                                                    jint depth, jint stencil, jint w, jint h) {
+                                                    jstring turnipPath, jint depth, jint stencil, jint w, jint h) {
     struct ctx *c = (struct ctx *) (intptr_t) instance;
     const char *path = osmesaPath ? (*env)->GetStringUTFChars(env, osmesaPath, NULL) : NULL;
-    const char *failure = load_osmesa(path);
+    const char *tpath = turnipPath ? (*env)->GetStringUTFChars(env, turnipPath, NULL) : NULL;
+    const char *failure = load_osmesa(path, tpath);
     if (path) (*env)->ReleaseStringUTFChars(env, osmesaPath, path);
+    if (tpath) (*env)->ReleaseStringUTFChars(env, turnipPath, tpath);
     if (failure) return err(env, "%s", failure);
     if (c->gl) return err(env, "context already created", NULL);
 

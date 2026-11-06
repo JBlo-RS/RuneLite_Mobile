@@ -16,3 +16,12 @@ libraries (the version RuneLite's client uses) built for Android by
 licensed and libffi MIT. Every native method in RuneLite's lwjgl-3.3.2 and
 lwjgl-opengl-3.3.2 jars has a matching symbol, except the Windows, macOS and Linux io_uring
 bindings, which RuneLite does not use on this platform.
+
+`arm64-v8a/libvulkan_freedreno.so` is Turnip, Mesa 25.2.1's open-source Vulkan driver for
+Qualcomm Adreno GPUs, built as an Android Vulkan HAL. It is copied unchanged from
+Amethyst-Android, a maintained PojavLauncher fork
+(`app_pojavlauncher/src/main/jniLibs/arm64-v8a`, commit 28d6e12d68121b7dd75f2e841058a6b7cdfe4a29,
+sha256 4535934c66a312c6139d94a5a398431fa711f2b81ddc296db0a213e9dda32dfd). Mesa is MIT licensed.
+It is used instead of the phone's own Vulkan driver on Qualcomm GPUs, where Zink 23.0.4
+aborts (`zink_resource.c:991`, seen on an Adreno 735). See `src/main/cpp/vk_turnip.c`.
+It should be replaced with a Turnip build made by this project.

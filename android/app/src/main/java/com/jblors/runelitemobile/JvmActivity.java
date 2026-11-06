@@ -98,6 +98,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         return Arrays.asList(
                 "-Drlm.gl.lib=" + new File(dir, "librlmgl.so").getAbsolutePath(),
                 "-Drlm.gl.osmesa=" + new File(dir, "libOSMesa.so").getAbsolutePath(),
+                "-Drlm.gl.turnip=" + new File(dir, "libvulkan_freedreno.so").getAbsolutePath(),
                 "-Dorg.lwjgl.librarypath=" + dir,
                 "-Dorg.lwjgl.opengl.explicitInit=true");
     }
@@ -683,7 +684,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         if (err != null) append("stdio redirect failed: " + err);
         append("== GPU test: desktop OpenGL through Mesa Zink (OpenGL on Vulkan)");
         String osmesa = new File(getApplicationInfo().nativeLibraryDir, "libOSMesa.so").getAbsolutePath();
-        String report = GpuProbe.run(osmesa);
+        String turnip = new File(getApplicationInfo().nativeLibraryDir, "libvulkan_freedreno.so").getAbsolutePath();
+        String report = GpuProbe.run(osmesa, turnip);
         append("== GPU test finished");
         ui.post(() -> {
             if (text != null) refreshLog();

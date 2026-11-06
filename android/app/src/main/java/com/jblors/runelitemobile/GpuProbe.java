@@ -9,5 +9,5 @@ final class GpuProbe {
     private GpuProbe() {}
 
     /** Runs the test and returns a readable report. Each step is also printed to stdout. */
-    static native String run(String osmesaPath);
+    static native String run(String osmesaPath, String turnipPath);
 }

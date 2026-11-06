@@ -77,7 +77,9 @@ public final class AWTContext {
     public void createGLContext() {
         String osmesa = System.getProperty("rlm.gl.osmesa");
         int w = Math.max(1, component.getWidth()), h = Math.max(1, component.getHeight());
-        String err = createGLContext0(instance, osmesa, depthBits, stencilBits, w, h);
+        // Turnip: used instead of the phone's Vulkan driver on Qualcomm GPUs (see vk_turnip.c)
+        String turnip = System.getProperty("rlm.gl.turnip");
+        String err = createGLContext0(instance, osmesa, turnip, depthBits, stencilBits, w, h);
         if (err != null) throw new RuntimeException("rlm-gl: " + err);
         initLwjgl();
         current = this;
@@ -198,7 +200,8 @@ public final class AWTContext {
 
     private static native void destroy0(long instance);
 
-    private static native String createGLContext0(long instance, String osmesaPath, int depth, int stencil, int w, int h);
+    private static native String createGLContext0(long instance, String osmesaPath, String turnipPath, int depth,
+                                                  int stencil, int w, int h);
 
     private static native String makeCurrent0(long instance, int w, int h);
 

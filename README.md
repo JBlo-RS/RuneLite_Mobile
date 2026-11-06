@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.17.1-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.18.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -100,6 +100,13 @@ How it works:
   It renders into a memory buffer the size of the game canvas.
 - `swapBuffers` publishes each frame. `ScreenCompositor` copies it into the canvas area of the
   screen sent to Android, under the RuneLite UI and dialogs.
+- On Qualcomm Adreno GPUs, Zink runs on **Turnip** (Mesa's open-source Adreno Vulkan driver,
+  `jniLibs/arm64-v8a/libvulkan_freedreno.so`, a prebuilt from Amethyst-Android) instead of the
+  phone's own driver. Pojav's Zink 23.0.4 aborts on Qualcomm's driver (seen on an Adreno 735).
+  `src/main/cpp/vk_turnip.c` opens Turnip's HAL module directly and exports
+  `vkGetInstanceProcAddr`, so Zink (which takes the Vulkan library from `$VULKAN_PTR`) uses it.
+  Two small stand-ins provide the `libcutils` and `libhardware` functions Turnip needs, because
+  apps can't load the real ones.
 - LWJGL's own natives (`liblwjgl.so`, `liblwjgl_opengl.so`) are built for Android by
   `tools/build-lwjgl-android.sh`.
 - LWJGL gets its GL functions from `OSMesaGetProcAddress`, because OSMesa doesn't export all of

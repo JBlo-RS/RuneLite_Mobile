@@ -20,6 +20,8 @@
 #include <time.h>
 #include <vulkan/vulkan.h>
 
+#include "vk_turnip.h"
+
 #define STEP(...) do { printf("gpu: " __VA_ARGS__); printf("\n"); fflush(stdout); } while (0)
 
 // OSMesa (GL/osmesa.h)
@@ -85,16 +87,17 @@ static double now_ms(void) {
 }
 
 /** Lists the Vulkan devices straight from the system driver (what Zink will run on). */
-static void probe_vulkan(void *libvulkan) {
+static uint32_t probe_vulkan(void *libvulkan) {
+    uint32_t vendor0 = 0;
     PFN_vkGetInstanceProcAddr gipa = (PFN_vkGetInstanceProcAddr) dlsym(libvulkan, "vkGetInstanceProcAddr");
-    if (!gipa) { out("Vulkan: vkGetInstanceProcAddr missing"); return; }
+    if (!gipa) { out("Vulkan: vkGetInstanceProcAddr missing"); return 0; }
     PFN_vkCreateInstance create = (PFN_vkCreateInstance) gipa(NULL, "vkCreateInstance");
     VkApplicationInfo app = {VK_STRUCTURE_TYPE_APPLICATION_INFO, NULL, "rlm-gpu-test", 1, NULL, 0, VK_API_VERSION_1_1};
     VkInstanceCreateInfo ci = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, NULL, 0, &app, 0, NULL, 0, NULL};
     VkInstance inst;
     STEP("vkCreateInstance");
     VkResult r = create(&ci, NULL, &inst);
-    if (r != VK_SUCCESS) { out("Vulkan: vkCreateInstance failed (%d)", r); return; }
+    if (r != VK_SUCCESS) { out("Vulkan: vkCreateInstance failed (%d)", r); return 0; }
     PFN_vkEnumeratePhysicalDevices enumerate = (PFN_vkEnumeratePhysicalDevices) gipa(inst, "vkEnumeratePhysicalDevices");
     PFN_vkGetPhysicalDeviceProperties props = (PFN_vkGetPhysicalDeviceProperties) gipa(inst, "vkGetPhysicalDeviceProperties");
     PFN_vkDestroyInstance destroy = (PFN_vkDestroyInstance) gipa(inst, "vkDestroyInstance");
@@ -106,12 +109,14 @@ static void probe_vulkan(void *libvulkan) {
     for (uint32_t i = 0; i < n; i++) {
         VkPhysicalDeviceProperties p;
         props(devs[i], &p);
+        if (i == 0) vendor0 = p.vendorID;
         out("Vulkan device %u: %s, Vulkan %u.%u.%u, driver 0x%x, vendor 0x%x", i, p.deviceName,
             VK_VERSION_MAJOR(p.apiVersion), VK_VERSION_MINOR(p.apiVersion), VK_VERSION_PATCH(p.apiVersion),
             p.driverVersion, p.vendorID);
     }
     if (n == 0) out("Vulkan: no devices");
     destroy(inst, NULL);
+    return vendor0;
 }
 
 struct osm {
@@ -218,7 +223,7 @@ static int probe_context(struct osm *o, const char *label, int profile, int majo
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_jblors_runelitemobile_GpuProbe_run(JNIEnv *env, jclass clazz, jstring osmesaPath) {
+Java_com_jblors_runelitemobile_GpuProbe_run(JNIEnv *env, jclass clazz, jstring osmesaPath, jstring turnipPath) {
     report[0] = 0;
     out("Android API %d", android_get_device_api_level());
 
@@ -228,11 +233,36 @@ Java_com_jblors_runelitemobile_GpuProbe_run(JNIEnv *env, jclass clazz, jstring o
         out("Vulkan: not available (%s)", dlerror());
         return (*env)->NewStringUTF(env, report);
     }
-    probe_vulkan(libvulkan);
+    uint32_t vendor = probe_vulkan(libvulkan);
 
-    // Pojav's Mesa build takes the Vulkan loader handle from $VULKAN_PTR
+    // Pojav's Mesa build takes "the Vulkan library" as a dlopen handle in $VULKAN_PTR. On
+    // Qualcomm GPUs that's Turnip (Zink 23.0 aborts on Qualcomm's own driver): see vk_turnip.c.
+    void *vulkan = libvulkan;
+    if (vendor == VENDOR_QUALCOMM) {
+        const char *tp = (*env)->GetStringUTFChars(env, turnipPath, NULL);
+        STEP("Qualcomm GPU: loading Turnip %s", tp);
+        const char *terr = turnip_load(tp);
+        (*env)->ReleaseStringUTFChars(env, turnipPath, tp);
+        if (terr) {
+            out("Turnip: %s", terr);
+            out("RESULT: Turnip (needed on Qualcomm GPUs) did not load, so GPU can't work here yet");
+            return (*env)->NewStringUTF(env, report);
+        }
+        char name[256], verr[256] = "";
+        uint32_t api = 0;
+        STEP("Turnip: vkCreateInstance");
+        uint32_t tv = vk_first_device(turnip_gipa(), name, sizeof(name), &api, verr, sizeof(verr));
+        if (!tv) {
+            out("Turnip: %s", verr);
+            out("RESULT: Turnip loaded but found no GPU, so GPU can't work here yet");
+            return (*env)->NewStringUTF(env, report);
+        }
+        out("Turnip device: %s, Vulkan %u.%u.%u", name, VK_VERSION_MAJOR(api), VK_VERSION_MINOR(api),
+            VK_VERSION_PATCH(api));
+        vulkan = turnip_handle();
+    }
     char ptr[32];
-    snprintf(ptr, sizeof(ptr), "%" PRIxPTR, (uintptr_t) libvulkan);
+    snprintf(ptr, sizeof(ptr), "%" PRIxPTR, (uintptr_t) vulkan);
     setenv("VULKAN_PTR", ptr, 1);
     setenv("GALLIUM_DRIVER", "zink", 1);
     setenv("MESA_SHADER_CACHE_DISABLE", "true", 1);
