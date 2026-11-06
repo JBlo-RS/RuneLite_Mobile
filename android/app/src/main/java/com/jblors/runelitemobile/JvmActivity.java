@@ -28,6 +28,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -222,6 +223,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
                 (x, y) -> screenLayout.toScreen(x, y), g -> lastGesture = g);
         sv.setOnTouchListener(touch);
         sv.setOnGenericMotionListener(touch);
+        touch.setTapButton(this::tapButton);
         game.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         keyboard = new KeyboardSink(this, t -> lastGesture = t);
@@ -261,6 +263,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             AwtBridge.tapKey(KeyMap.VK_ESCAPE);
             lastGesture = "Esc";
         })));
+        buttons.addView(floatingButton(prayInvButton()));
+        buttons.addView(floatingButton(rightClickButton()));
         column.addView(buttons);
         buttons.setVisibility(prefs.getBoolean("collapsed", false) ? View.GONE : View.VISIBLE);
 
@@ -444,6 +448,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             AwtBridge.tapKey(KeyMap.VK_ESCAPE);
             lastGesture = "Esc";
         }));
+        strip.addView(prayInvButton());
+        strip.addView(rightClickButton());
 
         View spacer = new View(this);
         strip.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
@@ -469,6 +475,153 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
         lp.bottomMargin = dp(6);
         b.setLayoutParams(lp);
         return b;
+    }
+
+    // ------------------------------------------------------------ R: right-click mode (one hand)
+
+    /** 0 = taps left-click, 1 = the next tap right-clicks, 2 = every tap right-clicks. */
+    private int rightClickMode;
+    private final List<TextView> rightClickButtons = new ArrayList<>();
+
+    /** Tap: off -> next tap right-clicks -> every tap right-clicks -> off. */
+    private TextView rightClickButton() {
+        TextView b = stripButton("R", false, null);
+        b.setOnClickListener(v -> {
+            rightClickMode = (rightClickMode + 1) % 3;
+            showRightClickMode();
+            lastGesture = new String[]{"taps: left click", "next tap: right click", "taps: right click"}[rightClickMode];
+        });
+        rightClickButtons.add(b);
+        showRightClickModeOn(b);
+        return b;
+    }
+
+    private void showRightClickMode() {
+        for (TextView b : rightClickButtons) showRightClickModeOn(b);
+    }
+
+    private void showRightClickModeOn(TextView b) {
+        b.setText(new String[]{"R", "R·1", "R ∞"}[rightClickMode]);
+        b.setBackground(roundRect(new int[]{0xFF333333, 0xFFDC8A00, 0xFFC0392B}[rightClickMode]));
+        b.setTextColor(rightClickMode == 0 ? Color.WHITE : Color.BLACK);
+    }
+
+    /** Called by TouchInput for each tap (UI thread). */
+    private int tapButton() {
+        if (rightClickMode == 0) return AwtBridge.BUTTON_LEFT;
+        if (rightClickMode == 1) {
+            rightClickMode = 0;
+            showRightClickMode();
+        }
+        return AwtBridge.BUTTON_RIGHT;
+    }
+
+    // ------------------------------------------------------------ Pray / Inv
+
+    private static final String[] TAB_KEY_NAMES = {"None", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8",
+            "F9", "F10", "F11", "F12", "Esc"};
+    private final List<TextView> prayInvButtons = new ArrayList<>();
+    /** Without the Mobile Controls plugin the open tab is unknown: alternate. */
+    private boolean prayerOpenGuess;
+    private final Runnable prayInvRefresh = new Runnable() {
+        @Override
+        public void run() {
+            showPrayInv();
+            if (!prayInvButtons.isEmpty()) prayInvButtons.get(0).postDelayed(this, 400);
+        }
+    };
+
+    /**
+     * Opens the prayer tab, or the inventory if the prayer tab is open, by pressing the game's
+     * own keybinds for them (like a keyboard would). Long press: choose the keys by hand.
+     */
+    private TextView prayInvButton() {
+        TextView b = stripButton("Pray", false, v -> togglePrayInv());
+        b.setOnLongClickListener(v -> {
+            chooseTabKeys();
+            return true;
+        });
+        prayInvButtons.add(b);
+        if (prayInvButtons.size() == 1) b.postDelayed(prayInvRefresh, 400);
+        return b;
+    }
+
+    /** Open tab from the Mobile Controls plugin (3 = inventory, 5 = prayer), or -1. */
+    private int openTab() {
+        try {
+            String t = AwtBridge.isReady() ? AwtBridge.jvmProperty("rlm.tab") : null;
+            return t == null ? -1 : Integer.parseInt(t);
+        } catch (RuntimeException e) {
+            return -1;
+        }
+    }
+
+    /** The game's key for a tab (0 none, 1-12 F1-F12, 13 Esc): from the plugin, else chosen by hand. */
+    private int tabKey(String which) {
+        try {
+            String k = AwtBridge.isReady() ? AwtBridge.jvmProperty("rlm.key." + which) : null;
+            if (k != null && Integer.parseInt(k) > 0) return Integer.parseInt(k);
+        } catch (RuntimeException ignored) {
+            // fall through
+        }
+        return getSharedPreferences("overlay", MODE_PRIVATE).getInt("key." + which, 0);
+    }
+
+    private boolean prayerTabOpen() {
+        int tab = openTab();
+        return tab >= 0 ? tab == 5 : prayerOpenGuess;
+    }
+
+    private void showPrayInv() {
+        String label = prayerTabOpen() ? "Inv" : "Pray";
+        for (TextView b : prayInvButtons) {
+            if (!label.contentEquals(b.getText())) b.setText(label);
+        }
+    }
+
+    private void togglePrayInv() {
+        boolean toInventory = prayerTabOpen();
+        String which = toInventory ? "inv" : "prayer";
+        int key = tabKey(which);
+        if (key <= 0 || key > 13) {
+            Toast.makeText(this, "No key set for the " + (toInventory ? "inventory" : "prayer")
+                    + " tab. Pick the keys from the game's Settings → Keybinds.", Toast.LENGTH_LONG).show();
+            chooseTabKeys();
+            return;
+        }
+        AwtBridge.tapKey(key == 13 ? KeyMap.VK_ESCAPE : KeyMap.VK_F1 + key - 1);
+        prayerOpenGuess = !toInventory;
+        lastGesture = (toInventory ? "inventory" : "prayer") + " tab (" + TAB_KEY_NAMES[key] + ")";
+        showPrayInv();
+    }
+
+    /** Lets the player enter their in-game keybinds for the inventory and prayer tabs. */
+    private void chooseTabKeys() {
+        android.content.SharedPreferences prefs = getSharedPreferences("overlay", MODE_PRIVATE);
+        String[] names = {"prayer", "inv"};
+        String[] titles = {"Key for the Prayer tab", "Key for the Inventory tab"};
+        Runnable[] ask = new Runnable[2];
+        for (int i = 1; i >= 0; i--) {
+            int idx = i;
+            ask[i] = () -> new android.app.AlertDialog.Builder(this)
+                    .setTitle(titles[idx])
+                    .setSingleChoiceItems(TAB_KEY_NAMES, prefs.getInt("key." + names[idx], 0), (d, which) -> {
+                        prefs.edit().putInt("key." + names[idx], which).apply();
+                        d.dismiss();
+                        if (idx == 0) ask[1].run();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Pray / Inv button")
+                .setMessage("The button presses the game's own keys for the Prayer and Inventory tabs. "
+                        + "Check them in the game: Settings → Keybinds (the keyboard icon). "
+                        + "With the Mobile Controls plugin on (Developer mode), the button reads them "
+                        + "from the game instead and these are not needed.")
+                .setPositiveButton("Set keys", (d, w) -> ask[0].run())
+                .setNegativeButton("Close", null)
+                .show();
     }
 
     /** Tap to hold the key down, tap again to release it; lit while held. */

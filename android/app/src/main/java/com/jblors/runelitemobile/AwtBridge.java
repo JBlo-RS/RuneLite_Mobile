@@ -96,6 +96,9 @@ final class AwtBridge {
         return out[0];
     }
 
+    /** A system property of the JVM (null if unset or the JVM isn't up). */
+    static native String jvmProperty(String key);
+
     /** True once the JVM has loaded the bridge (from CTCScreen). */
     static native boolean isReady();
 

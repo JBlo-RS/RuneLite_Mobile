@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.10.1-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.11.0-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -73,6 +73,8 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 
 | Plugin | What it does |
 | --- | --- |
+| Mobile Controls (`plugins/rlm-mobile`) | Tells the app which tab is open and the game's keybinds for the inventory and prayer tabs, for the Pray/Inv button (system properties `rlm.tab`, `rlm.key.inv`, `rlm.key.prayer`). |
+| Big Status Bars (`plugins/rlm-mobile`) | Large Hitpoints and Prayer bars, optionally special attack and run energy; HP turns green when poisoned and dark green when envenomed, and HP and Prayer flash below set thresholds. Movable (hold Alt and drag). |
 | Scurrius Helper (`plugins/scurrius-bricks`) | Marks the tiles where Scurrius' falling bricks (spot animation 2644) are about to land, and shows MOVE! if you are standing on one. Shows the protection prayer against his last attack (from his attack animation): a box around it in the prayer book (optionally also its icon above your character), green while it's on and red while it isn't. Everything can be changed in its settings. |
 
 ## GPU plugin (experimental)
@@ -107,6 +109,8 @@ How it works:
 | ⌨ (left strip) | soft keyboard; text arrives as `KEY_TYPED`, Backspace/Enter as key presses |
 | Alt / Shift / Ctrl (left strip) | tap to hold the key down, tap again to release (lit while held) |
 | Esc (left strip) | Escape |
+| Pray / Inv | opens the prayer tab, or the inventory if the prayer tab is open, by pressing the game's own keybinds for them (read from the game by the Mobile Controls plugin; otherwise long-press to enter them) |
+| R | right-click mode for one-handed play: tap once = the next tap right-clicks, again = every tap right-clicks, again = off |
 | Hardware keyboard / mouse | mapped directly |
 | Copy / paste | shared with Android's clipboard (text): select text, then Ctrl (hold) + C / V |
 

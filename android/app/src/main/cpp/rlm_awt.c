@@ -256,6 +256,36 @@ Java_com_jblors_runelitemobile_AwtBridge_selectSidebarTab(JNIEnv *aenv, jclass c
     (*jenv)->DeleteLocalRef(jenv, sb);
 }
 
+// A JVM system property (e.g. rlm.tab, set by the Mobile Controls plugin), or null.
+JNIEXPORT jstring JNICALL
+Java_com_jblors_runelitemobile_AwtBridge_jvmProperty(JNIEnv *aenv, jclass clazz, jstring key) {
+    JNIEnv *jenv = jdk_env();
+    if (jenv == NULL || key == NULL) return NULL;
+    if ((*jenv)->PushLocalFrame(jenv, 8) != 0) {
+        check_clear(jenv, "jvmProperty frame");
+        return NULL;
+    }
+    jstring result = NULL;
+    jclass sys = (*jenv)->FindClass(jenv, "java/lang/System");
+    jmethodID get = sys ? (*jenv)->GetStaticMethodID(jenv, sys, "getProperty",
+                                                     "(Ljava/lang/String;)Ljava/lang/String;") : NULL;
+    if (!check_clear(jenv, "System.getProperty lookup") && get != NULL) {
+        const char *k = (*aenv)->GetStringUTFChars(aenv, key, NULL);
+        jstring jk = (*jenv)->NewStringUTF(jenv, k); // strings don't cross VMs; copy
+        (*aenv)->ReleaseStringUTFChars(aenv, key, k);
+        jstring v = (jstring) (*jenv)->CallStaticObjectMethod(jenv, sys, get, jk);
+        if (!check_clear(jenv, "System.getProperty") && v != NULL) {
+            const char *utf = (*jenv)->GetStringUTFChars(jenv, v, NULL);
+            if (utf) {
+                result = (*aenv)->NewStringUTF(aenv, utf);
+                (*jenv)->ReleaseStringUTFChars(jenv, v, utf);
+            }
+        }
+    }
+    (*jenv)->PopLocalFrame(jenv, NULL);
+    return result;
+}
+
 // Installs com.jblors.rlm.WindowManager (maximizes resizable frames). Call once AWT is up.
 JNIEXPORT void JNICALL
 Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jclass clazz) {

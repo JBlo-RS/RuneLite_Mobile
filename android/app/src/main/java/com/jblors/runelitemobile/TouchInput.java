@@ -49,6 +49,13 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
     // physical mouse
     private int mouseButtons;
 
+    /** Which button a tap clicks (left normally; right in the R button's right-click mode). */
+    private java.util.function.IntSupplier tapButton = () -> AwtBridge.BUTTON_LEFT;
+
+    void setTapButton(java.util.function.IntSupplier tapButton) {
+        this.tapButton = tapButton;
+    }
+
     TouchInput(float density, Mapper map, Listener listener) {
         this.map = map;
         this.listener = listener;
@@ -103,8 +110,9 @@ final class TouchInput implements View.OnTouchListener, View.OnGenericMotionList
                     AwtBridge.mouseButton(AwtBridge.BUTTON_LEFT, false);
                     listener.onGesture("drag end");
                 } else if (!longPressed) {
-                    click(downX, downY, AwtBridge.BUTTON_LEFT);
-                    listener.onGesture("tap");
+                    int button = tapButton.getAsInt();
+                    click(downX, downY, button);
+                    listener.onGesture(button == AwtBridge.BUTTON_RIGHT ? "tap (right click)" : "tap");
                 }
                 multi = false;
                 return true;
