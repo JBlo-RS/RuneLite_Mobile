@@ -57,50 +57,110 @@ public interface BossHelperConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "scurrius", name = "Scurrius", description = "Helper for Scurrius", section = bosses, position = 100)
-	default boolean scurrius()
+	@ConfigItem(keyName = "abyssalSire", name = "Abyssal Sire", description = "Helper for Abyssal Sire", section = bosses, position = 100)
+	default boolean abyssalSire()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "jad", name = "TzTok-Jad / JalTok-Jad", description = "Helper for TzTok-Jad / JalTok-Jad", section = bosses, position = 101)
-	default boolean jad()
+	@ConfigItem(keyName = "amoxliatl", name = "Amoxliatl", description = "Helper for Amoxliatl", section = bosses, position = 101)
+	default boolean amoxliatl()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "dagannothKings", name = "Dagannoth Kings", description = "Helper for Dagannoth Kings", section = bosses, position = 102)
-	default boolean dagannothKings()
+	@ConfigItem(keyName = "brutus", name = "Brutus", description = "Helper for Brutus", section = bosses, position = 102)
+	default boolean brutus()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "phantomMuspah", name = "Phantom Muspah", description = "Helper for Phantom Muspah", section = bosses, position = 103)
-	default boolean phantomMuspah()
-	{
-		return true;
-	}
-
-	@ConfigItem(keyName = "sarachnis", name = "Sarachnis", description = "Helper for Sarachnis", section = bosses, position = 104)
-	default boolean sarachnis()
-	{
-		return true;
-	}
-
-	@ConfigItem(keyName = "chaosFanatic", name = "Chaos Fanatic", description = "Helper for Chaos Fanatic", section = bosses, position = 105)
+	@ConfigItem(keyName = "chaosFanatic", name = "Chaos Fanatic", description = "Helper for Chaos Fanatic", section = bosses, position = 103)
 	default boolean chaosFanatic()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "crazyArchaeologist", name = "Crazy Archaeologist", description = "Helper for Crazy Archaeologist", section = bosses, position = 106)
+	@ConfigItem(keyName = "crazyArchaeologist", name = "Crazy Archaeologist", description = "Helper for Crazy Archaeologist", section = bosses, position = 104)
 	default boolean crazyArchaeologist()
 	{
 		return true;
 	}
 
-	@ConfigItem(keyName = "derangedArchaeologist", name = "Deranged Archaeologist", description = "Helper for Deranged Archaeologist", section = bosses, position = 107)
+	@ConfigItem(keyName = "dagannothKings", name = "Dagannoth Kings", description = "Helper for Dagannoth Kings", section = bosses, position = 105)
+	default boolean dagannothKings()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "derangedArchaeologist", name = "Deranged Archaeologist", description = "Helper for Deranged Archaeologist", section = bosses, position = 106)
 	default boolean derangedArchaeologist()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "galvek", name = "Galvek", description = "Helper for Galvek", section = bosses, position = 107)
+	default boolean galvek()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "hespori", name = "Hespori", description = "Helper for Hespori", section = bosses, position = 108)
+	default boolean hespori()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "hueycoatl", name = "The Hueycoatl", description = "Helper for The Hueycoatl", section = bosses, position = 109)
+	default boolean hueycoatl()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsOfPeril", name = "Moons of Peril", description = "Helper for Moons of Peril", section = bosses, position = 110)
+	default boolean moonsOfPeril()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "phantomMuspah", name = "Phantom Muspah", description = "Helper for Phantom Muspah", section = bosses, position = 111)
+	default boolean phantomMuspah()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "royalTitans", name = "Royal Titans", description = "Helper for Royal Titans", section = bosses, position = 112)
+	default boolean royalTitans()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "sarachnis", name = "Sarachnis", description = "Helper for Sarachnis", section = bosses, position = 113)
+	default boolean sarachnis()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "scurrius", name = "Scurrius", description = "Helper for Scurrius", section = bosses, position = 114)
+	default boolean scurrius()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "jad", name = "TzTok-Jad / JalTok-Jad", description = "Helper for TzTok-Jad / JalTok-Jad", section = bosses, position = 115)
+	default boolean jad()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "vorkath", name = "Vorkath", description = "Helper for Vorkath", section = bosses, position = 116)
+	default boolean vorkath()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "zulrah", name = "Zulrah", description = "Helper for Zulrah", section = bosses, position = 117)
+	default boolean zulrah()
 	{
 		return true;
 	}
@@ -125,6 +185,26 @@ public interface BossHelperConfig extends Config
 				return crazyArchaeologist();
 			case DERANGED_ARCHAEOLOGIST:
 				return derangedArchaeologist();
+			case VORKATH:
+				return vorkath();
+			case ZULRAH:
+				return zulrah();
+			case ABYSSAL_SIRE:
+				return abyssalSire();
+			case ROYAL_TITANS:
+				return royalTitans();
+			case HESPORI:
+				return hespori();
+			case AMOXLIATL:
+				return amoxliatl();
+			case HUEYCOATL:
+				return hueycoatl();
+			case MOONS_OF_PERIL:
+				return moonsOfPeril();
+			case GALVEK:
+				return galvek();
+			case BRUTUS:
+				return brutus();
 			default:
 				return false;
 		}

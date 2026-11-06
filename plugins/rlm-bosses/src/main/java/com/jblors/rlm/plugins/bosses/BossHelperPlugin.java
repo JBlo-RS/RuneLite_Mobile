@@ -11,7 +11,16 @@ import net.runelite.api.Projectile;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.GameObject;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.events.GameObjectDespawned;
+import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.NpcChanged;
+import net.runelite.api.events.NpcSpawned;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -43,6 +52,27 @@ public class BossHelperPlugin extends Plugin
 	/** The prayer against the last attack seen; until a different one comes or the boss is gone. */
 	private volatile Style style;
 
+	/** Hazard objects on the floor (venom clouds), from all bosses' lists */
+	private final Set<GameObject> objects = ConcurrentHashMap.newKeySet();
+
+	/** Tiles where a lingering ground projectile landed -> game tick until which they stay marked */
+	private final Map<LocalPoint, Integer> lingering = new ConcurrentHashMap<>();
+
+	Set<GameObject> getObjects()
+	{
+		return objects;
+	}
+
+	Map<LocalPoint, Integer> getLingering()
+	{
+		return lingering;
+	}
+
+	int tick()
+	{
+		return client.getTickCount();
+	}
+
 	@Override
 	protected void startUp()
 	{
@@ -56,6 +86,8 @@ public class BossHelperPlugin extends Plugin
 		overlayManager.remove(prayerOverlay);
 		overlayManager.remove(tileOverlay);
 		style = null;
+		objects.clear();
+		lingering.clear();
 	}
 
 	Style getStyle()
@@ -82,7 +114,7 @@ public class BossHelperPlugin extends Plugin
 		{
 			return;
 		}
-		Style s = b.attackAnimations.get(e.getActor().getAnimation());
+		Style s = b.def.attackAnimations.get(e.getActor().getAnimation());
 		if (s != null)
 		{
 			style = s;
@@ -92,16 +124,44 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcChanged(NpcChanged e)
 	{
-		// A boss changing form (Phantom Muspah)
-		Boss b = bossOf(e.getNpc());
-		if (b != null)
+		formChange(e.getNpc());
+	}
+
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned e)
+	{
+		formChange(e.getNpc());
+	}
+
+	/** A boss appearing in, or changing to, a single-style form (Zulrah, Phantom Muspah). */
+	private void formChange(NPC npc)
+	{
+		Boss b = bossOf(npc);
+		Style s = b == null ? null : b.def.forms.get(npc.getId());
+		if (s != null)
 		{
-			Style s = b.forms.get(e.getNpc().getId());
-			if (s != null)
+			style = s;
+		}
+	}
+
+	@Subscribe
+	public void onGameObjectSpawned(GameObjectSpawned e)
+	{
+		int id = e.getGameObject().getId();
+		for (Boss b : Boss.values())
+		{
+			if (b.def.markedObjects.contains(id) && config.enabled(b))
 			{
-				style = s;
+				objects.add(e.getGameObject());
+				return;
 			}
 		}
+	}
+
+	@Subscribe
+	public void onGameObjectDespawned(GameObjectDespawned e)
+	{
+		objects.remove(e.getGameObject());
 	}
 
 	@Subscribe
@@ -118,16 +178,34 @@ public class BossHelperPlugin extends Plugin
 			}
 			present = true;
 			// Single-style forms: while it fights you
-			Style form = b.forms.get(npc.getId());
+			Style form = b.def.forms.get(npc.getId());
 			if (form != null && me != null && npc.getInteracting() == me && style == null)
 			{
 				style = form;
 			}
 		}
+		int now = client.getTickCount();
+		lingering.values().removeIf(until -> until < now);
 		if (!present)
 		{
 			style = null;
 			return;
+		}
+		// Ground projectiles that leave something behind (acid): remember where they land
+		for (Projectile p : client.getProjectiles())
+		{
+			if (p.getTargetActor() != null || p.getTarget() == null || p.getRemainingCycles() <= 0)
+			{
+				continue;
+			}
+			Boss b = bossOf(p.getSourceActor());
+			Integer ticks = b == null ? null : b.def.linger.get(p.getId());
+			if (ticks != null)
+			{
+				// client cycles are 20 ms; a game tick is 600 ms
+				int lands = now + p.getRemainingCycles() / 30 + 1;
+				lingering.merge(p.getTarget(), lands + ticks, Math::max);
+			}
 		}
 		// Projectiles aimed at you
 		if (me != null)
@@ -139,7 +217,7 @@ public class BossHelperPlugin extends Plugin
 					continue;
 				}
 				Boss b = bossOf(p.getSourceActor());
-				Style s = b == null ? null : b.projectiles.get(p.getId());
+				Style s = b == null ? null : b.def.projectiles.get(p.getId());
 				if (s != null)
 				{
 					style = s;
@@ -154,6 +232,11 @@ public class BossHelperPlugin extends Plugin
 		if (e.getGameState() != GameState.LOGGED_IN)
 		{
 			style = null;
+			lingering.clear();
+		}
+		if (e.getGameState() == GameState.LOADING)
+		{
+			objects.clear(); // the scene is rebuilt; objects spawn again
 		}
 	}
 

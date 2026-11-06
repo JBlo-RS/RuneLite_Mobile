@@ -5,7 +5,10 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
+import java.awt.Shape;
 import java.util.ArrayList;
+import java.util.Map;
+import net.runelite.api.GameObject;
 import java.util.List;
 import javax.inject.Inject;
 import net.runelite.api.Client;
@@ -62,6 +65,57 @@ class BossTileOverlay extends Overlay
 		}
 
 		List<LocalPoint> tiles = new ArrayList<>();
+		List<Shape> areas = new ArrayList<>(); // bigger hazards (clouds, threat circles)
+		Player me = client.getLocalPlayer();
+		LocalPoint mine = me == null ? null : me.getLocalLocation();
+		boolean underAttack = false;
+
+		for (GameObject o : plugin.getObjects())
+		{
+			Shape s = o.getCanvasTilePoly();
+			if (s != null)
+			{
+				areas.add(s);
+			}
+			if (mine != null && o.getSceneMinLocation() != null && o.getSceneMaxLocation() != null
+				&& mine.getSceneX() >= o.getSceneMinLocation().getX() && mine.getSceneX() <= o.getSceneMaxLocation().getX()
+				&& mine.getSceneY() >= o.getSceneMinLocation().getY() && mine.getSceneY() <= o.getSceneMaxLocation().getY())
+			{
+				underAttack = true;
+			}
+		}
+		for (NPC npc : client.getTopLevelWorldView().npcs())
+		{
+			boolean danger = false;
+			for (Boss b : here)
+			{
+				danger |= b.def.dangerNpcs.contains(npc.getId());
+			}
+			if (!danger)
+			{
+				continue;
+			}
+			Shape s = npc.getCanvasTilePoly();
+			if (s != null)
+			{
+				areas.add(s);
+			}
+			LocalPoint lp = npc.getLocalLocation();
+			int size = npc.getComposition() == null ? 1 : npc.getComposition().getSize();
+			if (mine != null && lp != null && Math.abs(mine.getSceneX() - lp.getSceneX()) <= size / 2
+				&& Math.abs(mine.getSceneY() - lp.getSceneY()) <= size / 2)
+			{
+				underAttack = true;
+			}
+		}
+		int now = plugin.tick();
+		for (Map.Entry<LocalPoint, Integer> e : plugin.getLingering().entrySet())
+		{
+			if (e.getValue() >= now)
+			{
+				tiles.add(e.getKey());
+			}
+		}
 		for (GraphicsObject go : client.getTopLevelWorldView().getGraphicsObjects())
 		{
 			if (go.finished() || go.getLocation() == null)
@@ -70,7 +124,7 @@ class BossTileOverlay extends Overlay
 			}
 			for (Boss b : here)
 			{
-				if (b.markedGraphics.contains(go.getId()))
+				if (b.def.markedGraphics.contains(go.getId()))
 				{
 					tiles.add(go.getLocation());
 					break;
@@ -84,20 +138,21 @@ class BossTileOverlay extends Overlay
 				continue;
 			}
 			Boss b = plugin.bossOf(p.getSourceActor());
-			if (b != null && b.markGroundProjectiles)
+			if (b != null && b.def.marksGround(p.getId()))
 			{
 				tiles.add(p.getTarget());
 			}
 		}
-		if (tiles.isEmpty())
+		if (tiles.isEmpty() && areas.isEmpty())
 		{
 			return null;
 		}
 
 		BasicStroke stroke = new BasicStroke(2);
-		Player me = client.getLocalPlayer();
-		LocalPoint mine = me == null ? null : me.getLocalLocation();
-		boolean underAttack = false;
+		for (Shape s : areas)
+		{
+			OverlayUtil.renderPolygon(g, s, config.tileOutline(), config.tileFill(), stroke);
+		}
 		for (LocalPoint lp : tiles)
 		{
 			Polygon poly = Perspective.getCanvasTilePoly(client, lp);
