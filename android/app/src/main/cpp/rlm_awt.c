@@ -15,7 +15,10 @@
 #include <android/bitmap.h>
 #include <android/log.h>
 #include <jni.h>
+#include <pthread.h>
 #include <stdatomic.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 
 #define TAG "rlm-awt"
@@ -32,10 +35,29 @@ static jmethodID m_receive;
 static jclass cls_helper;      // com.jblors.rlm.AndroidInput (our boot-classpath helper)
 static jmethodID m_wheel;
 
+// Android side of the clipboard: com.jblors.runelitemobile.AwtBridge (global ref, ART side)
+static jclass art_bridge;
+static jmethodID m_put_clipboard, m_read_clipboard;
+// CTCClipboard (global ref, JDK side)
+static jclass cls_clipboard;
+static jmethodID m_clipboard_received;
+
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     if (art_vm == NULL) {
         art_vm = vm;
         LOGI("loaded by ART");
+        // Called from AwtBridge's static initializer, so the app's classes are findable here
+        // (not later, from threads attached by native code)
+        JNIEnv *env;
+        if ((*vm)->GetEnv(vm, (void **) &env, JNI_VERSION_1_6) == JNI_OK) {
+            jclass c = (*env)->FindClass(env, "com/jblors/runelitemobile/AwtBridge");
+            if (c) {
+                art_bridge = (*env)->NewGlobalRef(env, c);
+                m_put_clipboard = (*env)->GetStaticMethodID(env, c, "putClipboard", "(Ljava/lang/String;)V");
+                m_read_clipboard = (*env)->GetStaticMethodID(env, c, "readClipboard", "()Ljava/lang/String;");
+            }
+            if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+        }
     } else if (vm != art_vm) {
         atomic_store(&jdk_vm, vm);
         LOGI("loaded by OpenJDK");
@@ -258,11 +280,98 @@ Java_com_jblors_runelitemobile_AwtBridge_installWindowManager(JNIEnv *aenv, jcla
     (*jenv)->DeleteLocalRef(jenv, wm);
 }
 
-// CTCClipboard natives. Clipboard sharing with Android comes later; until then
-// the Java clipboard simply stays local to the JVM.
-JNIEXPORT void JNICALL
-Java_com_github_caciocavallosilano_cacio_ctc_CTCClipboard_nQuerySystemClipboard(JNIEnv *env, jclass clazz) {}
+// CTCClipboard natives: the JVM's clipboard <-> Android's (text only).
 
+/** The calling thread's ART env, attaching it if needed (*attached = 1 then). */
+static JNIEnv *art_env(int *attached) {
+    JNIEnv *env = NULL;
+    *attached = 0;
+    if (!art_vm) return NULL;
+    jint r = (*art_vm)->GetEnv(art_vm, (void **) &env, JNI_VERSION_1_6);
+    if (r == JNI_EDETACHED) {
+        JavaVMAttachArgs args = {JNI_VERSION_1_6, "rlm-clipboard", NULL};
+        if ((*art_vm)->AttachCurrentThread(art_vm, &env, &args) != JNI_OK) return NULL;
+        *attached = 1;
+    } else if (r != JNI_OK) {
+        return NULL;
+    }
+    return env;
+}
+
+/** Copy: JVM text -> Android clipboard. */
 JNIEXPORT void JNICALL
 Java_com_github_caciocavallosilano_cacio_ctc_CTCClipboard_nPutClipboardData(JNIEnv *env, jclass clazz,
-                                                                          jstring data, jstring mime) {}
+                                                                          jstring data, jstring mime) {
+    if (!data || !art_bridge || !m_put_clipboard) return;
+    const char *utf = (*env)->GetStringUTFChars(env, data, NULL);
+    if (!utf) return;
+    int attached;
+    JNIEnv *aenv = art_env(&attached);
+    if (aenv) {
+        jstring s = (*aenv)->NewStringUTF(aenv, utf);
+        if (s) (*aenv)->CallStaticVoidMethod(aenv, art_bridge, m_put_clipboard, s);
+        if ((*aenv)->ExceptionCheck(aenv)) (*aenv)->ExceptionClear(aenv);
+        if (attached) (*art_vm)->DetachCurrentThread(art_vm);
+    }
+    (*env)->ReleaseStringUTFChars(env, data, utf);
+}
+
+/**
+ * Paste. CTCClipboard calls nQuerySystemClipboard() holding its lock, then waits on it until
+ * systemClipboardDataReceived() is called, so the answer must come from another thread, and
+ * must always come (null if there is no text) or the asking thread waits forever.
+ */
+static void *clipboard_query_thread(void *arg) {
+    char *text = NULL;
+    int attached;
+    JNIEnv *aenv = art_env(&attached);
+    if (aenv && art_bridge && m_read_clipboard) {
+        jstring s = (*aenv)->CallStaticObjectMethod(aenv, art_bridge, m_read_clipboard);
+        if ((*aenv)->ExceptionCheck(aenv)) {
+            (*aenv)->ExceptionClear(aenv);
+            s = NULL;
+        }
+        if (s) {
+            const char *utf = (*aenv)->GetStringUTFChars(aenv, s, NULL);
+            if (utf) {
+                text = strdup(utf);
+                (*aenv)->ReleaseStringUTFChars(aenv, s, utf);
+            }
+        }
+    }
+    if (attached) (*art_vm)->DetachCurrentThread(art_vm);
+
+    JavaVM *vm = atomic_load(&jdk_vm);
+    JNIEnv *env = NULL;
+    JavaVMAttachArgs args = {JNI_VERSION_1_6, "rlm-clipboard", NULL};
+    if (vm && (*vm)->AttachCurrentThreadAsDaemon(vm, &env, &args) == JNI_OK) {
+        jstring data = text ? (*env)->NewStringUTF(env, text) : NULL;
+        jstring mime = text ? (*env)->NewStringUTF(env, "plain") : NULL;
+        (*env)->CallStaticVoidMethod(env, cls_clipboard, m_clipboard_received, data, mime);
+        check_clear(env, "systemClipboardDataReceived");
+        (*vm)->DetachCurrentThread(vm);
+    }
+    free(text);
+    return NULL;
+}
+
+JNIEXPORT void JNICALL
+Java_com_github_caciocavallosilano_cacio_ctc_CTCClipboard_nQuerySystemClipboard(JNIEnv *env, jclass clazz) {
+    if (!cls_clipboard) {
+        m_clipboard_received = (*env)->GetStaticMethodID(env, clazz, "systemClipboardDataReceived",
+                                                         "(Ljava/lang/String;Ljava/lang/String;)V");
+        if (!m_clipboard_received) {
+            check_clear(env, "CTCClipboard lookup");
+            return;
+        }
+        cls_clipboard = (*env)->NewGlobalRef(env, clazz);
+    }
+    pthread_t t;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&t, &attr, clipboard_query_thread, NULL) != 0) {
+        LOGE("clipboard: cannot start thread");
+    }
+    pthread_attr_destroy(&attr);
+}

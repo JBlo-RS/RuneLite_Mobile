@@ -733,6 +733,7 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
             List<String> args = new ArrayList<>();
             if (isGraphical()) {
                 AwtBridge.init(); // ART must load libpojavexec_awt.so before the JVM does
+                AwtBridge.initClipboard(this);
                 File cacio = new File(getFilesDir(), "cacio");
                 JreInstaller.deleteRecursively(cacio);
                 for (String name : getAssets().list("cacio"))

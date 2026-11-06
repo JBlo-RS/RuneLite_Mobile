@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.9.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.9.1-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -90,6 +90,7 @@ How it works:
 | Alt / Shift / Ctrl (left strip) | tap to hold the key down, tap again to release (lit while held) |
 | Esc (left strip) | Escape |
 | Hardware keyboard / mouse | mapped directly |
+| Copy / paste | shared with Android's clipboard (text): select text, then Ctrl (hold) + C / V |
 
 Implementation notes:
 

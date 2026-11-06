@@ -1,6 +1,14 @@
 package com.jblors.runelitemobile;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Bitmap;
+import android.os.Handler;
+import android.os.Looper;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Android side of the Caciocavallo bridge (src/main/cpp/rlm_awt.c). */
 final class AwtBridge {
@@ -27,6 +35,65 @@ final class AwtBridge {
 
     static void init() {
         // Forces the static initializer
+    }
+
+    // ------------------------------------------------------------ clipboard
+    // The JVM's clipboard (Cacio's CTCClipboard) is connected to Android's through rlm_awt.c.
+
+    private static volatile Context appContext;
+    private static volatile ClipboardManager clipboard;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    /** Call on the main thread before the JVM starts. */
+    static void initClipboard(Context ctx) {
+        appContext = ctx.getApplicationContext();
+        clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+    }
+
+    /** Called from native code (any thread) when RuneLite copies text. */
+    @SuppressWarnings("unused")
+    static void putClipboard(String text) {
+        ClipboardManager c = clipboard;
+        if (c == null || text == null) return;
+        MAIN.post(() -> {
+            try {
+                c.setPrimaryClip(ClipData.newPlainText("RuneLite", text));
+            } catch (RuntimeException e) {
+                // e.g. text too large for a binder transaction
+            }
+        });
+    }
+
+    /**
+     * Called from native code (a background thread) when RuneLite pastes: Android's clipboard
+     * text, or null. Read on the main thread (Android only lets the focused app read it), with a
+     * time limit, because the JVM thread that asked waits for the answer.
+     */
+    @SuppressWarnings("unused")
+    static String readClipboard() {
+        ClipboardManager c = clipboard;
+        if (c == null) return null;
+        String[] out = new String[1];
+        CountDownLatch done = new CountDownLatch(1);
+        MAIN.post(() -> {
+            try {
+                ClipData clip = c.getPrimaryClip();
+                if (clip != null && clip.getItemCount() > 0) {
+                    CharSequence t = clip.getItemAt(0).coerceToText(appContext);
+                    if (t != null) out[0] = t.toString();
+                }
+            } catch (RuntimeException e) {
+                // no access: leave empty
+            } finally {
+                done.countDown();
+            }
+        });
+        try {
+            done.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return out[0];
     }
 
     /** True once the JVM has loaded the bridge (from CTCScreen). */
