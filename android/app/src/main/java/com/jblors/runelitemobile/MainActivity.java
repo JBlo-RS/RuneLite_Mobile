@@ -88,7 +88,38 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         checkGpuCrash();
+        checkGpuTestCrash();
         refresh();
+    }
+
+    /** A GPU test that crashed never shows its result: show what it found before the crash. */
+    private void checkGpuTestCrash() {
+        File log = JvmActivity.logFile(this);
+        if (!log.isFile() || log.lastModified() == prefs().getLong("gpuTestCrashSeen", 0)) return;
+        String text = readLog();
+        if (!text.contains("== GPU test:") || text.contains("== GPU test finished")) return;
+        prefs().edit().putLong("gpuTestCrashSeen", log.lastModified()).apply();
+        StringBuilder found = new StringBuilder();
+        String lastStep = "";
+        for (String l : text.split("\n")) {
+            if (!l.startsWith("gpu: ")) continue;
+            String line = l.substring(5);
+            if (line.startsWith("Android") || line.startsWith("Vulkan") || line.startsWith("[")) {
+                found.append(line).append('\n');
+            } else {
+                lastStep = line; // the step it was on (printed before each step runs)
+            }
+        }
+        if (text.contains("assertion")) {
+            for (String l : text.split("\n")) if (l.contains("assertion")) lastStep += "\n" + l.trim();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("GPU test crashed")
+                .setMessage("The GPU driver crashed during the test, so GPU won't work on this device yet.\n\n"
+                        + "Found before the crash:\n" + found + "\nCrashed at: " + lastStep)
+                .setPositiveButton("Share log", (d, w) -> shareLog())
+                .setNegativeButton("Close", null)
+                .show();
     }
 
     /**
