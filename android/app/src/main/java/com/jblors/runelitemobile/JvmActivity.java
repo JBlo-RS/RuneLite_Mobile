@@ -84,6 +84,8 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
     static final String EXTRA_MOBILE_LAYOUT = "mobileLayout";
     /** Intent extra: true = give RuneLite's GPU plugin an OpenGL context (Zink via OSMesa). */
     static final String EXTRA_GPU = "gpu";
+    /** Intent extra: true = enlarge the game picture with nearest-neighbour (crisp) scaling. */
+    static final String EXTRA_SHARP_SCALING = "sharpScaling";
 
     /** RuneLite's sidebar incl. its icon strip, and its title bar, in virtual px (measured). */
     private static final int RUNELITE_SIDEBAR_W = 274;
@@ -763,7 +765,9 @@ public class JvmActivity extends Activity implements SurfaceHolder.Callback {
 
     private void renderLoop() {
         Bitmap frame = Bitmap.createBitmap(screenW, screenH, Bitmap.Config.ARGB_8888);
-        Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        // Smooth: bilinear filtering; Sharp: nearest neighbour (each game pixel a crisp block)
+        Paint paint = getIntent().getBooleanExtra(EXTRA_SHARP_SCALING, false)
+                ? new Paint() : new Paint(Paint.FILTER_BITMAP_FLAG);
         Rect bandSrc = new Rect(), bandDst = new Rect();
         Paint shadow = new Paint();
         shadow.setColor(0x99000000);

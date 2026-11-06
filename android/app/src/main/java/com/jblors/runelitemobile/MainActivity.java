@@ -30,8 +30,9 @@ import java.util.Properties;
 public class MainActivity extends Activity {
     private static final int REQ_IMPORT_CREDENTIALS = 1;
     private static final int REQ_IMPORT_PLUGIN = 2;
-    private static final int[] UI_SIZES = {720, 630, 540};
-    private static final String[] UI_SIZE_NAMES = {"Small", "Medium", "Large"};
+    // Height of the game's virtual screen: higher = sharper picture, smaller buttons and text
+    private static final int[] UI_SIZES = {1080, 900, 720, 630, 540};
+    private static final String[] UI_SIZE_NAMES = {"1080p", "900p", "720p", "630p", "540p"};
 
     // RuneLite-ish palette
     private static final int BG = 0xFF171717;
@@ -42,7 +43,7 @@ public class MainActivity extends Activity {
     private static final int MUTED = 0xFF8C8C8C;
 
     private TextView accountName, accountHint, accountAction;
-    private LinearLayout layoutChoice, sizeChoice, gpuChoice, more;
+    private LinearLayout layoutChoice, sizeChoice, scalingChoice, gpuChoice, more;
     private TextView moreToggle;
 
     @Override
@@ -217,6 +218,18 @@ public class MainActivity extends Activity {
             refresh();
         });
         card.addView(sizeChoice, marginTop(dp(8)));
+        card.addView(text("Higher is sharper, with smaller buttons and text, and more work for the "
+                + "phone. On a tablet try 900p or 1080p.", 12, MUTED), marginTop(dp(6)));
+
+        card.addView(label("SCALING"), marginTop(dp(16)));
+        scalingChoice = segmented(new String[]{"Smooth", "Sharp"}, i -> {
+            prefs().edit().putBoolean("sharpScaling", i == 1).apply();
+            refresh();
+        });
+        card.addView(scalingChoice, marginTop(dp(8)));
+        card.addView(text("How the game picture is enlarged to fill the screen: Smooth blends "
+                + "pixels (soft), Sharp keeps them crisp (blocky, like OSRS on a big monitor).", 12, MUTED),
+                marginTop(dp(6)));
 
         card.addView(label("GPU (EXPERIMENTAL)"), marginTop(dp(16)));
         gpuChoice = segmented(new String[]{"Off", "On"}, i -> {
@@ -283,7 +296,7 @@ public class MainActivity extends Activity {
     private int uiSizeIndex() {
         int h = prefs().getInt("screenHeight", JvmActivity.DEFAULT_SCREEN_HEIGHT);
         for (int i = 0; i < UI_SIZES.length; i++) if (UI_SIZES[i] == h) return i;
-        return 1;
+        return 3; // 630p
     }
 
     private boolean gpu() {
@@ -298,6 +311,7 @@ public class MainActivity extends Activity {
         if (layoutChoice == null) return;
         select(layoutChoice, mobileLayout() ? 0 : 1);
         select(sizeChoice, uiSizeIndex());
+        select(scalingChoice, prefs().getBoolean("sharpScaling", false) ? 1 : 0);
         select(gpuChoice, gpu() ? 1 : 0);
         Properties creds = JagexCredentials.load(this);
         if (creds == null) {
@@ -315,7 +329,8 @@ public class MainActivity extends Activity {
         startActivity(JvmActivity.intent(this, mode)
                 .putExtra(JvmActivity.EXTRA_SCREEN_HEIGHT, UI_SIZES[uiSizeIndex()])
                 .putExtra(JvmActivity.EXTRA_MOBILE_LAYOUT, mobileLayout())
-                .putExtra(JvmActivity.EXTRA_GPU, gpu()));
+                .putExtra(JvmActivity.EXTRA_GPU, gpu())
+                .putExtra(JvmActivity.EXTRA_SHARP_SCALING, prefs().getBoolean("sharpScaling", false)));
     }
 
     private void onAccountAction() {
