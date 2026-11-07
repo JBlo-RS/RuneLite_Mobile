@@ -24,11 +24,11 @@ public interface LazyFlickConfig extends Config
 	}
 
 	@Alpha
-	@ConfigItem(keyName = "color", name = "Highlight colour", position = 1,
-		description = "Colour of the prayer button on the tick to press it")
+	@ConfigItem(keyName = "color", name = "Pray colour", position = 1,
+		description = "Colour of the prayer button on the tick to press it (traffic lights: green)")
 	default Color color()
 	{
-		return new Color(255, 230, 0, 230);
+		return new Color(40, 220, 60, 230);
 	}
 
 	@ConfigItem(keyName = "aboveMe", name = "Also show above you", position = 2,
@@ -38,11 +38,11 @@ public interface LazyFlickConfig extends Config
 		return false;
 	}
 
-	@ConfigItem(keyName = "countdown", name = "Show ticks to attack", position = 3,
-		description = "Show the ticks until the NPC's next attack above it (the highlight comes at 1)")
+	@ConfigItem(keyName = "countdown", name = "Countdown", position = 3,
+		description = "Count down to the tick to pray on the prayer button and above the NPC: a 4-tick NPC goes 3, 2 (red), 1 (orange), then PRAY (green)")
 	default boolean countdown()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(keyName = "wiki", name = "Look up the wiki", position = 4,

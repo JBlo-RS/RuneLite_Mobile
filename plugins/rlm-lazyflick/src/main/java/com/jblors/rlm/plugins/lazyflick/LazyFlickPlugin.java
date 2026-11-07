@@ -110,15 +110,27 @@ public class LazyFlickPlugin extends Plugin
 	/** What to show now (set each GameTick): prayers to press, and ticks until each NPC's attack */
 	private volatile Set<Style> flickNow = EnumSet.noneOf(Style.class);
 	private volatile Map<NPC, Integer> ticksLeft = new HashMap<>();
+	/** The countdown per prayer: the soonest of the NPCs it's against */
+	private volatile Map<Style, Integer> prayerCount = new java.util.EnumMap<>(Style.class);
 
 	Set<Style> getFlickNow()
 	{
 		return flickNow;
 	}
 
+	/**
+	 * The countdown above each NPC: ticks until the tick to press the prayer, so a 4-tick NPC
+	 * shows 3 on its attack tick, then 2, 1, and 0 on the tick to press (shown as PRAY).
+	 */
 	Map<NPC, Integer> getTicksLeft()
 	{
 		return ticksLeft;
+	}
+
+	/** The same countdown per prayer, for its button: the soonest NPC's */
+	Map<Style, Integer> getPrayerCount()
+	{
+		return prayerCount;
 	}
 
 	@Provides
@@ -163,6 +175,7 @@ public class LazyFlickPlugin extends Plugin
 		hitThisTick.clear();
 		flickNow = EnumSet.noneOf(Style.class);
 		ticksLeft = new HashMap<>();
+		prayerCount = new java.util.EnumMap<>(Style.class);
 	}
 
 	@Subscribe
@@ -253,6 +266,7 @@ public class LazyFlickPlugin extends Plugin
 
 		Set<Style> now = EnumSet.noneOf(Style.class);
 		Map<NPC, Integer> left = new HashMap<>();
+		Map<Style, Integer> count = new java.util.EnumMap<>(Style.class);
 		for (Map.Entry<NPC, Fight> f : fights.entrySet())
 		{
 			NPC npc = f.getKey();
@@ -262,17 +276,21 @@ public class LazyFlickPlugin extends Plugin
 				continue;
 			}
 			int next = f.getValue().lastAttack + speed;
-			if (next > tick)
+			Style st = style(npc.getId(), f.getValue().lastAnim);
+			int toPress = next - 1 - tick; // 0: press the prayer now
+			if (toPress >= 0)
 			{
-				left.put(npc, next - tick);
+				left.put(npc, toPress);
+				count.merge(st, toPress, Math::min);
 			}
-			if (next - 1 == tick)
+			if (toPress == 0)
 			{
-				now.add(style(npc.getId(), f.getValue().lastAnim));
+				now.add(st);
 			}
 		}
 		flickNow = now;
 		ticksLeft = left;
+		prayerCount = count;
 		if (tick % SAVE_EVERY_TICKS == 0)
 		{
 			db.saveIfChanged();
