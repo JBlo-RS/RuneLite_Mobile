@@ -69,6 +69,7 @@ public class BossHelperPlugin extends Plugin
 	public void onGroundObjectSpawned(net.runelite.api.events.GroundObjectSpawned e)
 	{
 		moons.objectSpawned(e.getGroundObject(), client.getTickCount());
+		hazardObject(e.getGroundObject());
 		if (config.debugLog() && near(e.getGroundObject().getWorldLocation()))
 		{
 			debug("gobj:" + e.getGroundObject().getId(), "ground object " + e.getGroundObject().getId() + " at " + e.getGroundObject().getWorldLocation());
@@ -79,6 +80,7 @@ public class BossHelperPlugin extends Plugin
 	public void onGroundObjectDespawned(net.runelite.api.events.GroundObjectDespawned e)
 	{
 		moons.objectDespawned(e.getGroundObject(), client.getTickCount());
+		objects.remove(e.getGroundObject());
 	}
 
 	@Inject
@@ -379,13 +381,13 @@ public class BossHelperPlugin extends Plugin
 	/** The prayer against the last attack seen; until a different one comes or the boss is gone. */
 	private volatile Style style;
 
-	/** Hazard objects on the floor (venom clouds), from all bosses' lists */
-	private final Set<GameObject> objects = ConcurrentHashMap.newKeySet();
+	/** Hazard objects on the floor (venom clouds), from all bosses' lists: game or ground objects */
+	private final Set<net.runelite.api.TileObject> objects = ConcurrentHashMap.newKeySet();
 
 	/** Tiles where a lingering ground projectile landed -> game tick until which they stay marked */
 	private final Map<LocalPoint, Integer> lingering = new ConcurrentHashMap<>();
 
-	Set<GameObject> getObjects()
+	Set<net.runelite.api.TileObject> getObjects()
 	{
 		return objects;
 	}
@@ -635,11 +637,17 @@ public class BossHelperPlugin extends Plugin
 		{
 			debug("obj:" + id, "object " + id + " at " + e.getGameObject().getWorldLocation());
 		}
+		hazardObject(e.getGameObject());
+	}
+
+	/** Keeps an object that is on a boss's hazard list (game or ground object: either kind works). */
+	private void hazardObject(net.runelite.api.TileObject o)
+	{
 		for (Boss b : Boss.values())
 		{
-			if (b.def.markedObjects.contains(id) && BossToggles.enabled(config, b))
+			if (b.def.markedObjects.contains(o.getId()) && BossToggles.enabled(config, b))
 			{
-				objects.add(e.getGameObject());
+				objects.add(o);
 				return;
 			}
 		}

@@ -68,7 +68,7 @@ enum Boss
 		.graphics(3208, 3225)), // ROYAL_TITANS_AREA_ATTACK_ICE, SPOTANIM_PLACEHOLDER_FIRE_QUEEN_LOC_ATTACK
 
 	HESPORI("Hespori", npcs(8583)
-		.anim(RANGED, 8224) // HESPORI_ATTACK_RANGED
+		// Its one attack animation (HESPORI_ATTACK_RANGED) is used for both styles: the projectile decides
 		.projectile(RANGED, 1639).projectile(MAGIC, 1640)), // HESPORI_RANGE_PROJ, _MAGIC_PROJ
 
 	AMOXLIATL("Amoxliatl", npcs(13685)

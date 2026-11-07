@@ -72,16 +72,29 @@ class BossTileOverlay extends Overlay
 		LocalPoint mine = me == null ? null : me.getLocalLocation();
 		boolean underAttack = false;
 
-		for (GameObject o : plugin.getObjects())
+		for (net.runelite.api.TileObject o : plugin.getObjects())
 		{
 			Shape s = o.getCanvasTilePoly();
 			if (s != null)
 			{
 				areas.add(s);
 			}
-			if (mine != null && o.getSceneMinLocation() != null && o.getSceneMaxLocation() != null
-				&& mine.getSceneX() >= o.getSceneMinLocation().getX() && mine.getSceneX() <= o.getSceneMaxLocation().getX()
-				&& mine.getSceneY() >= o.getSceneMinLocation().getY() && mine.getSceneY() <= o.getSceneMaxLocation().getY())
+			if (mine == null)
+			{
+				continue;
+			}
+			if (o instanceof GameObject)
+			{
+				GameObject go = (GameObject) o;
+				if (go.getSceneMinLocation() != null && go.getSceneMaxLocation() != null
+					&& mine.getSceneX() >= go.getSceneMinLocation().getX() && mine.getSceneX() <= go.getSceneMaxLocation().getX()
+					&& mine.getSceneY() >= go.getSceneMinLocation().getY() && mine.getSceneY() <= go.getSceneMaxLocation().getY())
+				{
+					underAttack = true;
+				}
+			}
+			else if (o.getLocalLocation() != null && o.getLocalLocation().getSceneX() == mine.getSceneX()
+				&& o.getLocalLocation().getSceneY() == mine.getSceneY())
 			{
 				underAttack = true;
 			}
