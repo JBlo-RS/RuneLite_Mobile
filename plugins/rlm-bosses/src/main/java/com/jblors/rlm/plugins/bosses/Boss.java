@@ -27,7 +27,8 @@ enum Boss
 		.anim(MAGIC, 9918).anim(MELEE, 9920).anim(RANGED, 9922) // NPC_MUSPAH_ATTACK_*_01
 		.projectile(MAGIC, 2327, 4029).projectile(RANGED, 2329) // PROJECTILE_MUSPAH_ATTACK_*
 		.form(12077, RANGED).form(12078, MELEE)
-		.graphics(2335, 2336)), // VFX_MUSPAH_SPIKE_WARNING_01/_02
+		.graphics(2335, 2336) // VFX_MUSPAH_SPIKE_WARNING_01/_02
+		.objects(46693)), // MUSPAH_SPIKE_PRE: where a spike is about to come up
 
 	SARACHNIS("Sarachnis", npcs(8713)
 		.anim(MELEE, 8147).anim(RANGED, 4410) // HOSDUN_SPIDER_BOSS_ATTACK_*
@@ -49,7 +50,8 @@ enum Boss
 		.anim(MELEE, 7951) // DS2_VORKATH_ATTACK_MELEE
 		.projectile(RANGED, 1477).projectile(MAGIC, 1479) // VORKATH_RANGED_TRAVEL, _MAGIC_TRAVEL
 		.ground(1481, 1482, 2266) // VORKATH_AREA_TRAVEL(_SMALL): the firebomb
-		.linger(1483, 25)), // VORKATH_ACID_TRAVEL: acid pools stay for the acid phase
+		.ground(1483) // VORKATH_ACID_TRAVEL: acid on its way
+		.objects(32000)), // VORKATH_ACID: the pools themselves, for as long as they're there
 
 	ZULRAH("Zulrah", npcs(2042, 2043, 2044) // SNAKEBOSS_BOSS_RANGED, _MELEE, _MAGIC
 		.form(2042, RANGED).form(2043, MELEE).form(2044, MAGIC)
@@ -61,7 +63,7 @@ enum Boss
 		.anim(MELEE, 5366, 5369, 5751, 5755) // SIRE_RIGHT_HOOK, _ATTACK_RIGHT_WHIP, _DOUBLE_HOOK, _DOUBLE_WHIPS
 		.graphics(1275).ground(1275)), // ABYSSAL_MIASMA_SPOTANIM
 
-	ROYAL_TITANS("Royal Titans", npcs(12596, 14147) // RT_FIRE_QUEEN, RT_ICE_KING
+	ROYAL_TITANS("Royal Titans", npcs(12596, 14147, 14148, 14149) // RT_FIRE_QUEEN, RT_ICE_KING (+ _INACTIVE)
 		.dangerNpcs(14152, 14153) // RS_LOC_ATTACK_FIRE_HITBOX, _ICE_HITBOX
 		.graphics(3208, 3225)), // ROYAL_TITANS_AREA_ATTACK_ICE, SPOTANIM_PLACEHOLDER_FIRE_QUEEN_LOC_ATTACK
 
@@ -76,18 +78,25 @@ enum Boss
 	HUEYCOATL("The Hueycoatl", npcs(14009, 14013) // HUEY_HEAD, HUEY_HEAD_ENRAGED
 		.anim(MELEE, 11669, 11673).anim(RANGED, 11670, 11674).anim(MAGIC, 11671, 11675) // HUEY_(SHIELD_)ATTACK_*
 		.projectile(MELEE, 2969).projectile(RANGED, 2972).projectile(MAGIC, 2975) // VFX_HUEY_ATTACK_*_PROJANIM_01
-		.graphicsRange(2977, 2992)), // VFX_HUEY_TAIL_SLAM_SHOCKWAVE_*
+		.graphicsRange(2977, 2992) // VFX_HUEY_TAIL_SLAM_SHOCKWAVE_*
+		.objects(55209)), // HUEY_ATTACK_TILES_LOC
 
 	MOONS_OF_PERIL("Moons of Peril", npcs(13016, 13017, 13018, 13019) // PMOON_BOSS_BLOOD/BLUE/ECLIPSE_MOON, _ECLIPSE_CLONE
 		.form(13016, MELEE).form(13017, MELEE).form(13018, MELEE).form(13019, MELEE)
-		.dangerNpcs(13014, 13015, 13027)), // PMOON_BOSS_(SMALL_)THREAT_CIRCLE, PMOON_BOSS_WINTER_STORM
+		.dangerNpcs(13014, 13015, 13027) // PMOON_BOSS_(SMALL_)THREAT_CIRCLE, PMOON_BOSS_WINTER_STORM
+		// PMOON_BOSS_SMALL_THREAT_CIRCLE, _THREAT_CIRCLE, _BLOOD_RAIN, _BLOOD_POOL, _BLOOD_POOL_HARD (objects)
+		.objects(51041, 51042, 51045, 51046, 52991)),
 
 	GALVEK("Galvek", npcs(8094, 8095, 8096, 8097, 8098) // GALVEK_WAVES/FIRE/WATER/WIND/EARTH
 		.projectile(RANGED, 1489).projectile(MAGIC, 1490) // GALVEK_RANGED_TRAVEL, _MAGIC_TRAVEL
-		.groundAll()), // GALVEK_AREA_TRAVEL and the elemental specials
+		.groundAll() // GALVEK_AREA_TRAVEL and the elemental specials
+		.objects(32378)), // GALVEK_BOMB
 
-	BRUTUS("Brutus", npcs(15625, 15626) // COWBOSS_UNNAMED, COWBOSS
+	// COWBOSS_MAPPED, _UNNAMED, COWBOSS, _ROUTEFIND (all Brutus), _HARDMODE, _HARDMODE_GHOST (Demonic
+	// Brutus), _INVISIBLE_PROJ_NPC (fires the hard-mode projectiles)
+	BRUTUS("Brutus / Demonic Brutus", npcs(15624, 15625, 15626, 15627, 15628, 15629, 15630)
 		.anim(MELEE, 13783) // COW_BOSS_ATTACK
+		.graphics(3588, 3589, 3590) // VFX_COWBOSS_STOMP_IMPACT01-03: the stomp's shockwave rings
 		.projectile(RANGED, 3591).projectile(MELEE, 3592).projectile(MAGIC, 3593)); // VFX_COWBOSS_HM_*_01
 
 	final String displayName;
