@@ -1,6 +1,5 @@
 package com.jblors.rlm.plugins.mobile;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -13,6 +12,7 @@ import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Point;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -22,11 +22,10 @@ import net.runelite.client.util.Text;
 class BigMenuOverlay extends Overlay
 {
 	private static final Pattern COL = Pattern.compile("<col=([0-9a-fA-F]{1,6})>");
-	private static final Color BACK = new Color(25, 22, 18, 235);
-	private static final Color HEADER = new Color(0, 0, 0, 255);
-	private static final Color HEADER_TEXT = new Color(93, 84, 71);
-	private static final Color LINE = new Color(93, 84, 71);
-	private static final Color HOVER = new Color(255, 255, 255, 40);
+	// The game's own menu: a 0x5D5447 frame, black header with "Choose Option" in the frame
+	// colour, black-outlined option area, white text with a shadow, yellow for the hovered option
+	private static final Color FRAME = new Color(0x5D5447);
+	private static final Color HOVER_TEXT = new Color(0xFFFF00);
 
 	private final Client client;
 	private final BigMenuPlugin plugin;
@@ -59,7 +58,7 @@ class BigMenuOverlay extends Overlay
 			return null;
 		}
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		Font font = new Font("Dialog", Font.PLAIN, config.fontSize());
+		Font font = FontManager.getRunescapeBoldFont().deriveFont((float) config.fontSize());
 		g.setFont(font);
 		FontMetrics fm = g.getFontMetrics();
 
@@ -81,44 +80,31 @@ class BigMenuOverlay extends Overlay
 		int y = clamp(client.getMenuY(), 0, canvasH - h);
 		BigMenuLayout l = new BigMenuLayout(client.getMenuX(), client.getMenuY(), client.getMenuWidth(), n, x, y, w, header, rowH);
 
-		g.setColor(BACK);
+		// Frame, black header, black outline round the options (as the game draws its menu)
+		g.setColor(FRAME);
 		g.fillRect(x, y, w, h);
-		g.setColor(HEADER);
-		g.fillRect(x, y, w, header);
-		g.setColor(HEADER_TEXT);
-		g.drawString("Choose Option", x + 10, y + (header + fm.getAscent() - fm.getDescent()) / 2);
+		g.setColor(Color.BLACK);
+		g.fillRect(x + 1, y + 1, w - 2, header - 2);
+		g.drawRect(x + 1, y + header, w - 3, h - header - 2);
+		int textY = y + (header + fm.getAscent() - fm.getDescent()) / 2;
+		g.setColor(FRAME);
+		g.drawString("Choose Option", x + 6, textY);
 
 		Point mouse = client.getMouseCanvasPosition();
 		for (int row = 0; row < n; row++)
 		{
 			MenuEntry e = entries[n - 1 - row]; // the game lists the newest entry on top
 			int ry = y + header + row * rowH;
-			if (row > 0)
-			{
-				g.setColor(LINE);
-				g.drawLine(x + 6, ry, x + w - 6, ry);
-			}
 			// The game's cursor is moved to the matching native row, so compare in that space
-			if (mouse != null && mouse.getY() >= l.menuY + BigMenuLayout.NATIVE_HEADER + row * BigMenuLayout.NATIVE_ROW
+			boolean hovered = mouse != null
+				&& mouse.getY() >= l.menuY + BigMenuLayout.NATIVE_HEADER + row * BigMenuLayout.NATIVE_ROW
 				&& mouse.getY() < l.menuY + BigMenuLayout.NATIVE_HEADER + (row + 1) * BigMenuLayout.NATIVE_ROW
-				&& mouse.getX() >= l.menuX && mouse.getX() < l.menuX + l.menuW)
-			{
-				g.setColor(HOVER);
-				g.fillRect(x, ry, w, rowH);
-			}
+				&& mouse.getX() >= l.menuX && mouse.getX() < l.menuX + l.menuW;
 			int ty = ry + (rowH + fm.getAscent() - fm.getDescent()) / 2;
-			String option = Text.removeTags(e.getOption());
-			g.setColor(Color.WHITE);
-			g.drawString(option, x + 12, ty);
 			String target = e.getTarget() == null ? "" : e.getTarget();
-			if (!target.isEmpty())
-			{
-				drawColoured(g, fm, " " + target, x + 12 + fm.stringWidth(option), ty);
-			}
+			drawColoured(g, fm, e.getOption() + (target.isEmpty() ? "" : " " + target), x + 6, ty,
+				hovered ? HOVER_TEXT : Color.WHITE);
 		}
-		g.setColor(LINE);
-		g.setStroke(new BasicStroke(2));
-		g.drawRect(x, y, w - 1, h - 1);
 		plugin.setLayout(l);
 		return null;
 	}
@@ -129,9 +115,9 @@ class BigMenuOverlay extends Overlay
 	}
 
 	/** Draws text with the game's colour tags (e.g. NPC name yellow, combat level green). */
-	private static void drawColoured(Graphics2D g, FontMetrics fm, String text, int x, int y)
+	private static void drawColoured(Graphics2D g, FontMetrics fm, String text, int x, int y, Color base)
 	{
-		Color color = Color.WHITE;
+		Color color = base;
 		Matcher m = COL.matcher(text);
 		int pos = 0;
 		while (true)
@@ -140,6 +126,8 @@ class BigMenuOverlay extends Overlay
 			String part = Text.removeTags(text.substring(pos, found ? m.start() : text.length()));
 			if (!part.isEmpty())
 			{
+				g.setColor(Color.BLACK); // the game's text shadow
+				g.drawString(part, x + 1, y + 1);
 				g.setColor(color);
 				g.drawString(part, x, y);
 				x += fm.stringWidth(part);

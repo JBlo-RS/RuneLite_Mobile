@@ -66,8 +66,8 @@ android {
         applicationId = "com.jblors.runelitemobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "0.18.0"
+        versionCode = 39
+        versionName = "0.18.1"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" }
