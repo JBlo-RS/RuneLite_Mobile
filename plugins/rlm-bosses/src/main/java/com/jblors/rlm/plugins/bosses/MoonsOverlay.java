@@ -151,13 +151,13 @@ class MoonsOverlay extends Overlay
 	}
 
 	/**
-	 * Centred on the tick to move: counts down (4, 3), says MOVE on the move tick (2 left), and
+	 * Counts down to the tick to move: on screen 4 ticks with MOVE at 2 left shows 2, 1, MOVE, and
 	 * after that the tile just stays red with no number (too late to matter).
 	 */
 	private String label(int left)
 	{
 		int moveAt = config.moonsMoveAt();
-		return left > moveAt ? Integer.toString(left) : left == moveAt ? "MOVE" : "";
+		return left > moveAt ? Integer.toString(left - moveAt) : left == moveAt ? "MOVE" : "";
 	}
 
 	private void countdown(Graphics2D g, Polygon poly, Point text, int left)
