@@ -27,6 +27,11 @@ final class BossDef
 	final Set<Integer> markedObjects = new HashSet<>();
 	/** NPCs that are hazards on the floor (threat circles, area attacks) */
 	final Set<Integer> dangerNpcs = new HashSet<>();
+	/**
+	 * Attacks announced by overhead text (Brutus' *growl* / *snort*): animation -> name. Which
+	 * text goes with which attack is learned in game (see BossHelperPlugin.onOverheadTextChanged).
+	 */
+	final Map<Integer, String> tells = new HashMap<>();
 
 	static BossDef npcs(int... ids)
 	{
@@ -117,6 +122,12 @@ final class BossDef
 		{
 			dangerNpcs.add(i);
 		}
+		return this;
+	}
+
+	BossDef tell(int animation, String name)
+	{
+		tells.put(animation, name);
 		return this;
 	}
 

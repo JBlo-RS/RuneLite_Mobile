@@ -34,11 +34,16 @@ final class BigMenuLayout
 		return px >= x && px < x + drawW * k && py >= y && py < y + menuH * k;
 	}
 
-	/** The point on the game's menu matching a point on the big menu. */
+	/**
+	 * The point on the game's menu matching a point on the big menu: the middle of the same
+	 * option's row (or of the header), so rounding can't land it on a neighbouring row.
+	 */
 	Point toNative(int px, int py)
 	{
-		int nx = menuX + Math.max(1, Math.min(menuW - 2, (px - x) / k));
-		int ny = menuY + Math.max(0, Math.min(menuH - 1, (py - y) / k));
+		int nx = menuX + menuW / 2;
+		int dy = (py - y) / k - NATIVE_HEADER;
+		int row = dy < 0 ? -1 : Math.min(entries - 1, dy / NATIVE_ROW);
+		int ny = row < 0 ? menuY + NATIVE_HEADER / 2 : menuY + NATIVE_HEADER + row * NATIVE_ROW + NATIVE_ROW / 2;
 		return new Point(nx, ny);
 	}
 

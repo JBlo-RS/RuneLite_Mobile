@@ -7,9 +7,11 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
-@ConfigGroup("rlmbosses")
+@ConfigGroup(BossHelperConfig.GROUP)
 public interface BossHelperConfig extends Config
 {
+	String GROUP = "rlmbosses";
+
 	@ConfigSection(name = "Prayer", description = "The prayer against the boss's attack", position = 0)
 	String prayer = "prayer";
 
@@ -38,6 +40,12 @@ public interface BossHelperConfig extends Config
 	default boolean prayerIcon()
 	{
 		return false;
+	}
+
+	@ConfigItem(keyName = "attackWarnings", name = "Attack warnings", description = "Big warning above a boss that announces its next attack with overhead text (Brutus' growl / snort). Learns which text means which attack during the fight.", section = prayer, position = 4)
+	default boolean attackWarnings()
+	{
+		return true;
 	}
 
 	@ConfigItem(keyName = "prayerHideWhenOn", name = "Hide when praying it", description = "Only show the prayer while it isn't on (otherwise it turns green)", section = prayer, position = 3)

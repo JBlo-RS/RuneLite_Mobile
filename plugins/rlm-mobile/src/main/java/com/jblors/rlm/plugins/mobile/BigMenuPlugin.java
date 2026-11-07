@@ -88,7 +88,9 @@ public class BigMenuPlugin extends Plugin
 	protected void startUp()
 	{
 		overlayManager.add(overlay);
-		mouseManager.registerMouseListener(0, listener);
+		// Last in line: after Stretched Mode's listener has turned stretched coordinates into the
+		// game's (it registers itself first), so events here are in the same space as the menu
+		mouseManager.registerMouseListener(listener);
 	}
 
 	@Override

@@ -96,6 +96,8 @@ enum Boss
 	// Brutus), _INVISIBLE_PROJ_NPC (fires the hard-mode projectiles)
 	BRUTUS("Brutus / Demonic Brutus", npcs(15624, 15625, 15626, 15627, 15628, 15629, 15630)
 		.anim(MELEE, 13783) // COW_BOSS_ATTACK
+		// His attacks hit at once; the warning is his overhead *growl* / *snort* (from a fight log)
+		.tell(13778, "CHARGE").tell(13785, "STOMP").tell(13783, "ATTACK") // COW_BOSS_CHARGE, _STOMP, _ATTACK
 		.graphics(3588, 3589, 3590) // VFX_COWBOSS_STOMP_IMPACT01-03: the stomp's shockwave rings
 		.projectile(RANGED, 3591).projectile(MELEE, 3592).projectile(MAGIC, 3593)); // VFX_COWBOSS_HM_*_01
 

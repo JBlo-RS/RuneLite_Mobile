@@ -1,6 +1,9 @@
 package com.jblors.rlm.plugins.mobile;
 
+import com.google.inject.Provides;
 import javax.inject.Inject;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameTick;
@@ -26,6 +29,50 @@ public class MobileControlsPlugin extends Plugin
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private MobileControlsConfig config;
+
+	private boolean wasLoggedIn;
+
+	/**
+	 * Logging out (back to the login screen; world hops don't go there) ends the session: close
+	 * RuneLite so the app returns to its launch screen. System.exit runs RuneLite's shutdown
+	 * hooks (settings are saved); the app's JVM process then ends.
+	 */
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged e)
+	{
+		if (e.getGameState() == GameState.LOGGED_IN)
+		{
+			wasLoggedIn = true;
+		}
+		else if (e.getGameState() == GameState.LOGIN_SCREEN && wasLoggedIn && config.closeOnLogout())
+		{
+			wasLoggedIn = false;
+			System.out.println("rlm-mobile: logged out; closing RuneLite");
+			Thread t = new Thread(() ->
+			{
+				try
+				{
+					Thread.sleep(500); // let the logout finish
+				}
+				catch (InterruptedException ignored)
+				{
+					// exit anyway
+				}
+				System.exit(0);
+			}, "rlm-logout-exit");
+			t.setDaemon(true);
+			t.start();
+		}
+	}
+
+	@Provides
+	MobileControlsConfig provideConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(MobileControlsConfig.class);
+	}
 
 	@Override
 	protected void shutDown()

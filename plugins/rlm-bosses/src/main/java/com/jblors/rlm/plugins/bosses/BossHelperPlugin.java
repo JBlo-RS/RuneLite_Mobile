@@ -18,6 +18,7 @@ import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.NpcChanged;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.OverheadTextChanged;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +28,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 @PluginDescriptor(
 	name = "Boss Helper",
@@ -49,6 +51,97 @@ public class BossHelperPlugin extends Plugin
 
 	@Inject
 	private BossTileOverlay tileOverlay;
+
+	@Inject
+	private BossTellOverlay tellOverlay;
+
+	@Inject
+	private ConfigManager configManager;
+
+	// ------------------------------------------------------------ attack warnings (overhead text)
+
+	/** The boss that just announced an attack, what it said, and when */
+	private volatile NPC tellNpc;
+	private volatile String tellText, tellKey;
+	private volatile int tellTick;
+
+	/** The warning to show above tellNpc, or null */
+	private volatile String warning;
+
+	NPC getWarningNpc()
+	{
+		return warning == null ? null : tellNpc;
+	}
+
+	String getWarning()
+	{
+		return config.attackWarnings() ? warning : null;
+	}
+
+	/** Learned "which text comes before which attack", also kept in RuneLite's settings */
+	private final Map<String, String> learned = new ConcurrentHashMap<>();
+
+	private String learnedAttack(String key)
+	{
+		String v = learned.get(key);
+		if (v == null && configManager != null)
+		{
+			v = configManager.getConfiguration(BossHelperConfig.GROUP, key);
+			if (v != null)
+			{
+				learned.put(key, v);
+			}
+		}
+		return v;
+	}
+
+	/** "*Snort*" -> "snort" */
+	private static String tellKeyOf(String text)
+	{
+		return Text.removeTags(text).toLowerCase().replaceAll("[^a-z ]", "").trim().replace(' ', '_');
+	}
+
+	@Subscribe
+	public void onOverheadTextChanged(OverheadTextChanged e)
+	{
+		Boss b = bossOf(e.getActor());
+		if (b == null || b.def.tells.isEmpty() || e.getOverheadText() == null || e.getOverheadText().isEmpty())
+		{
+			return;
+		}
+		debug("say:" + idOf(e.getActor()) + ":" + e.getOverheadText(), describe(e.getActor()) + " says '" + e.getOverheadText() + "'");
+		tellNpc = (NPC) e.getActor();
+		tellText = Text.removeTags(e.getOverheadText());
+		tellKey = tellKeyOf(e.getOverheadText());
+		tellTick = client.getTickCount();
+		String attack = learnedAttack("tell." + b.name() + "." + tellKey);
+		warning = attack != null ? attack + " incoming!" : tellText + " (attack coming)";
+	}
+
+	/** An announced attack started: remember which text came before it, and clear the warning. */
+	private void tellAttack(Boss b, Actor a, int animation)
+	{
+		String attack = b.def.tells.get(animation);
+		if (attack == null || a != tellNpc || tellKey == null)
+		{
+			return;
+		}
+		if (client.getTickCount() - tellTick <= 8)
+		{
+			String key = "tell." + b.name() + "." + tellKey;
+			if (!attack.equals(learnedAttack(key)))
+			{
+				learned.put(key, attack);
+				if (configManager != null)
+				{
+					configManager.setConfiguration(BossHelperConfig.GROUP, key, attack);
+				}
+				System.out.println("rlm-boss: learned: '" + tellText + "' comes before " + attack);
+			}
+		}
+		warning = null;
+		tellKey = null;
+	}
 
 	/** The prayer against the last attack seen; until a different one comes or the boss is gone. */
 	private volatile Style style;
@@ -79,6 +172,7 @@ public class BossHelperPlugin extends Plugin
 	{
 		overlayManager.add(prayerOverlay);
 		overlayManager.add(tileOverlay);
+		overlayManager.add(tellOverlay);
 	}
 
 	@Override
@@ -86,6 +180,8 @@ public class BossHelperPlugin extends Plugin
 	{
 		overlayManager.remove(prayerOverlay);
 		overlayManager.remove(tileOverlay);
+		overlayManager.remove(tellOverlay);
+		warning = null;
 		style = null;
 		objects.clear();
 		lingering.clear();
@@ -201,6 +297,7 @@ public class BossHelperPlugin extends Plugin
 		{
 			return;
 		}
+		tellAttack(b, e.getActor(), e.getActor().getAnimation());
 		Style s = b.def.attackAnimations.get(e.getActor().getAnimation());
 		if (s != null)
 		{
@@ -286,6 +383,10 @@ public class BossHelperPlugin extends Plugin
 		}
 		int now = client.getTickCount();
 		lingering.values().removeIf(until -> until < now);
+		if (warning != null && now - tellTick > 8)
+		{
+			warning = null; // nothing came of it
+		}
 		if (!present)
 		{
 			style = null;
