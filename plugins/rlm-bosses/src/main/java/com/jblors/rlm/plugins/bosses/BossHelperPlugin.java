@@ -101,18 +101,75 @@ public class BossHelperPlugin extends Plugin
 		return Text.removeTags(text).toLowerCase().replaceAll("[^a-z ]", "").trim().replace(' ', '_');
 	}
 
+	/** Each announcing boss's overhead text as last seen, to notice when it changes */
+	private final Map<NPC, String> lastOverhead = new java.util.WeakHashMap<>();
+
 	@Subscribe
 	public void onOverheadTextChanged(OverheadTextChanged e)
 	{
-		Boss b = bossOf(e.getActor());
-		if (b == null || b.def.tells.isEmpty() || e.getOverheadText() == null || e.getOverheadText().isEmpty())
+		tell(e.getActor(), e.getOverheadText(), "overhead event");
+	}
+
+	/**
+	 * Overhead text is also read directly each client frame: the OverheadTextChanged event isn't
+	 * reliable for NPCs (RuneLite's own plugins only use it for players), and Brutus' growl
+	 * didn't arrive through it.
+	 */
+	@Subscribe
+	public void onClientTick(net.runelite.api.events.ClientTick e)
+	{
+		for (NPC npc : client.getTopLevelWorldView().npcs())
+		{
+			Boss b = bossOf(npc);
+			if (b == null || b.def.tells.isEmpty())
+			{
+				continue;
+			}
+			String text = npc.getOverheadText();
+			String before = lastOverhead.put(npc, text);
+			if (text != null && !text.isEmpty() && !text.equals(before))
+			{
+				tell(npc, text, "overhead text");
+			}
+		}
+	}
+
+	/** NPC speech in the chatbox, in case a boss announces its attack there. */
+	@Subscribe
+	public void onChatMessage(net.runelite.api.events.ChatMessage e)
+	{
+		if (e.getType() != net.runelite.api.ChatMessageType.NPC_SAY || e.getName() == null)
 		{
 			return;
 		}
-		debug("say:" + idOf(e.getActor()) + ":" + e.getOverheadText(), describe(e.getActor()) + " says '" + e.getOverheadText() + "'");
-		tellNpc = (NPC) e.getActor();
-		tellText = Text.removeTags(e.getOverheadText());
-		tellKey = tellKeyOf(e.getOverheadText());
+		String name = Text.removeTags(e.getName());
+		for (NPC npc : client.getTopLevelWorldView().npcs())
+		{
+			Boss b = bossOf(npc);
+			if (b != null && !b.def.tells.isEmpty() && name.equalsIgnoreCase(npc.getName()))
+			{
+				tell(npc, e.getMessage(), "chat");
+				return;
+			}
+		}
+	}
+
+	private void tell(Actor a, String text, String via)
+	{
+		Boss b = bossOf(a);
+		if (b == null || b.def.tells.isEmpty() || text == null || text.isEmpty())
+		{
+			return;
+		}
+		String key = tellKeyOf(text);
+		if (a == tellNpc && key.equals(tellKey) && client.getTickCount() - tellTick <= 1)
+		{
+			return; // the same announcement seen another way
+		}
+		debug("say:" + idOf(a) + ":" + text, describe(a) + " says '" + text + "' (" + via + ")");
+		tellNpc = (NPC) a;
+		tellText = Text.removeTags(text);
+		tellKey = key;
 		tellTick = client.getTickCount();
 		String attack = learnedAttack("tell." + b.name() + "." + tellKey);
 		warning = attack != null ? attack + " incoming!" : tellText + " (attack coming)";
