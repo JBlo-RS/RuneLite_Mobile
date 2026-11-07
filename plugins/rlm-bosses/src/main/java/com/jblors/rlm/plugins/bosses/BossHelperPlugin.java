@@ -232,7 +232,7 @@ public class BossHelperPlugin extends Plugin
 	{
 		for (Boss b : Boss.values())
 		{
-			if (b.def.dangerNpcs.contains(id) && config.enabled(b))
+			if (b.def.dangerNpcs.contains(id) && BossToggles.enabled(config, b))
 			{
 				return true;
 			}
@@ -406,6 +406,14 @@ public class BossHelperPlugin extends Plugin
 		lingering.clear();
 	}
 
+	/** The boss the current prayer is against (for the icon above it) */
+	private volatile NPC styleNpc;
+
+	NPC getStyleNpc()
+	{
+		return style == null ? null : styleNpc;
+	}
+
 	Style getStyle()
 	{
 		return style;
@@ -419,7 +427,7 @@ public class BossHelperPlugin extends Plugin
 			return null;
 		}
 		Boss b = Boss.of(((NPC) a).getId());
-		return b != null && config.enabled(b) ? b : null;
+		return b != null && BossToggles.enabled(config, b) ? b : null;
 	}
 
 	// ------------------------------------------------------------ debug log
@@ -548,6 +556,7 @@ public class BossHelperPlugin extends Plugin
 		if (s != null)
 		{
 			style = s;
+			styleNpc = (NPC) e.getActor();
 		}
 	}
 
@@ -581,6 +590,7 @@ public class BossHelperPlugin extends Plugin
 		if (s != null)
 		{
 			style = s;
+			styleNpc = npc;
 		}
 	}
 
@@ -594,7 +604,7 @@ public class BossHelperPlugin extends Plugin
 		}
 		for (Boss b : Boss.values())
 		{
-			if (b.def.markedObjects.contains(id) && config.enabled(b))
+			if (b.def.markedObjects.contains(id) && BossToggles.enabled(config, b))
 			{
 				objects.add(e.getGameObject());
 				return;
@@ -660,6 +670,7 @@ public class BossHelperPlugin extends Plugin
 			if (form != null && me != null && npc.getInteracting() == me && style == null)
 			{
 				style = form;
+				styleNpc = npc;
 			}
 		}
 		int now = client.getTickCount();
@@ -704,6 +715,7 @@ public class BossHelperPlugin extends Plugin
 					seen((NPC) p.getSourceActor());
 				}
 				Style s = b == null ? null : b.def.projectiles.get(p.getId());
+				NPC owner = b != null ? (NPC) p.getSourceActor() : null;
 				if (s == null && b == null)
 				{
 					// Fired by something that isn't the boss itself (Demonic Brutus' attacks): any
@@ -714,13 +726,17 @@ public class BossHelperPlugin extends Plugin
 						if (tb != null && tb.def.projectiles.containsKey(p.getId()))
 						{
 							s = tb.def.projectiles.get(p.getId());
-							break;
+							if (owner == null || owner.getId() == 15630) // prefer a visible boss over COWBOSS_INVISIBLE_PROJ_NPC
+							{
+								owner = n;
+							}
 						}
 					}
 				}
 				if (s != null)
 				{
 					style = s;
+					styleNpc = owner;
 				}
 			}
 		}

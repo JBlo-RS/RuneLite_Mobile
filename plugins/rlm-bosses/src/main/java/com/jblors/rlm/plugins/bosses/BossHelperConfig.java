@@ -36,6 +36,12 @@ public interface BossHelperConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(keyName = "prayerAboveBoss", name = "Icon above boss", description = "Show the prayer's icon above the boss that attacked", section = prayer, position = 0)
+	default boolean prayerAboveBoss()
+	{
+		return true;
+	}
+
 	@ConfigItem(keyName = "prayerIcon", name = "Icon over character", description = "Also show the prayer's icon above your character", section = prayer, position = 2)
 	default boolean prayerIcon()
 	{
@@ -182,48 +188,4 @@ public interface BossHelperConfig extends Config
 		return true;
 	}
 
-	default boolean enabled(Boss boss)
-	{
-		switch (boss)
-		{
-			case SCURRIUS:
-				return scurrius();
-			case JAD:
-				return jad();
-			case DAGANNOTH_KINGS:
-				return dagannothKings();
-			case PHANTOM_MUSPAH:
-				return phantomMuspah();
-			case SARACHNIS:
-				return sarachnis();
-			case CHAOS_FANATIC:
-				return chaosFanatic();
-			case CRAZY_ARCHAEOLOGIST:
-				return crazyArchaeologist();
-			case DERANGED_ARCHAEOLOGIST:
-				return derangedArchaeologist();
-			case VORKATH:
-				return vorkath();
-			case ZULRAH:
-				return zulrah();
-			case ABYSSAL_SIRE:
-				return abyssalSire();
-			case ROYAL_TITANS:
-				return royalTitans();
-			case HESPORI:
-				return hespori();
-			case AMOXLIATL:
-				return amoxliatl();
-			case HUEYCOATL:
-				return hueycoatl();
-			case MOONS_OF_PERIL:
-				return moonsOfPeril();
-			case GALVEK:
-				return galvek();
-			case BRUTUS:
-				return brutus();
-			default:
-				return false;
-		}
-	}
 }

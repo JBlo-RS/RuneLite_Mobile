@@ -74,6 +74,24 @@ class BossPrayerOverlay extends Overlay
 				g.draw(b);
 			}
 		}
+		if (config.prayerAboveBoss())
+		{
+			net.runelite.api.NPC boss = plugin.getStyleNpc();
+			BufferedImage icon = spriteManager.getSprite(style.sprite, 0);
+			net.runelite.api.coords.LocalPoint lp = boss == null ? null : boss.getLocalLocation();
+			Point p = lp == null || icon == null ? null
+				: net.runelite.api.Perspective.getCanvasImageLocation(client, lp, icon, boss.getLogicalHeight() + 40);
+			if (p != null)
+			{
+				Rectangle box = new Rectangle(p.getX() - 4, p.getY() - 4, icon.getWidth() + 8, icon.getHeight() + 8);
+				g.setColor(new Color(0, 0, 0, 150));
+				g.fill(box);
+				g.setColor(color);
+				g.setStroke(new BasicStroke(2));
+				g.draw(box);
+				g.drawImage(icon, p.getX(), p.getY(), null);
+			}
+		}
 		if (config.prayerIcon())
 		{
 			Player me = client.getLocalPlayer();

@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.20.0-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.20.1-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
