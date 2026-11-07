@@ -56,6 +56,32 @@ public class BossHelperPlugin extends Plugin
 	private BossTellOverlay tellOverlay;
 
 	@Inject
+	private MoonsOverlay moonsOverlay;
+
+	private final MoonsTracker moons = new MoonsTracker();
+
+	MoonsTracker getMoons()
+	{
+		return moons;
+	}
+
+	@Subscribe
+	public void onGroundObjectSpawned(net.runelite.api.events.GroundObjectSpawned e)
+	{
+		moons.objectSpawned(e.getGroundObject(), client.getTickCount());
+		if (config.debugLog() && near(e.getGroundObject().getWorldLocation()))
+		{
+			debug("gobj:" + e.getGroundObject().getId(), "ground object " + e.getGroundObject().getId() + " at " + e.getGroundObject().getWorldLocation());
+		}
+	}
+
+	@Subscribe
+	public void onGroundObjectDespawned(net.runelite.api.events.GroundObjectDespawned e)
+	{
+		moons.objectDespawned(e.getGroundObject(), client.getTickCount());
+	}
+
+	@Inject
 	private ConfigManager configManager;
 
 	@Inject
@@ -346,6 +372,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcDespawned(net.runelite.api.events.NpcDespawned e)
 	{
+		moons.npcDespawned(e.getNpc(), client.getTickCount());
 		tracked.remove(e.getNpc());
 	}
 
@@ -390,6 +417,7 @@ public class BossHelperPlugin extends Plugin
 		overlayManager.add(prayerOverlay);
 		overlayManager.add(tileOverlay);
 		overlayManager.add(tellOverlay);
+		overlayManager.add(moonsOverlay);
 	}
 
 	@Override
@@ -398,6 +426,8 @@ public class BossHelperPlugin extends Plugin
 		overlayManager.remove(prayerOverlay);
 		overlayManager.remove(tileOverlay);
 		overlayManager.remove(tellOverlay);
+		overlayManager.remove(moonsOverlay);
+		moons.clear();
 		tracked.clear();
 		stompTiles = chargeTiles = null;
 		warning = null;
@@ -563,6 +593,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcChanged(NpcChanged e)
 	{
+		moons.npcSpawned(e.getNpc(), client.getTickCount());
 		track(e.getNpc());
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
@@ -574,6 +605,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcSpawned(NpcSpawned e)
 	{
+		moons.npcSpawned(e.getNpc(), client.getTickCount());
 		track(e.getNpc());
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
@@ -597,6 +629,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onGameObjectSpawned(GameObjectSpawned e)
 	{
+		moons.objectSpawned(e.getGameObject(), client.getTickCount());
 		int id = e.getGameObject().getId();
 		if (config.debugLog() && client.getGameState() == GameState.LOGGED_IN && near(e.getGameObject().getWorldLocation()))
 		{
@@ -615,6 +648,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onGameObjectDespawned(GameObjectDespawned e)
 	{
+		moons.objectDespawned(e.getGameObject(), client.getTickCount());
 		objects.remove(e.getGameObject());
 	}
 
@@ -752,6 +786,10 @@ public class BossHelperPlugin extends Plugin
 			if (e.getGameState() == GameState.LOGIN_SCREEN || e.getGameState() == GameState.HOPPING)
 			{
 				tracked.clear();
+			}
+			if (e.getGameState() == GameState.LOADING || e.getGameState() == GameState.LOGIN_SCREEN)
+			{
+				moons.clear(); // the scene is rebuilt; things spawn again
 			}
 		}
 		if (e.getGameState() == GameState.LOADING)

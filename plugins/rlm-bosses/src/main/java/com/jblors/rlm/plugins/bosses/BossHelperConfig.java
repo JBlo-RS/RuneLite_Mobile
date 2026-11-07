@@ -21,6 +21,46 @@ public interface BossHelperConfig extends Config
 	@ConfigSection(name = "Bosses", description = "Which bosses to help with", position = 20)
 	String bosses = "bosses";
 
+	@ConfigSection(name = "Perilous Moons", description = "Blood Moon, Blue Moon and Eclipse Moon hazards (no prayers: they don't work there)", position = 25)
+	String moons = "moons";
+
+	@ConfigItem(keyName = "moonsBloodPools", name = "Blood pools", description = "Mark blood pools with a tick countdown", section = moons, position = 1)
+	default boolean moonsBloodPools()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsBloodRain", name = "Blood rain", description = "Mark blood rain with a tick countdown", section = moons, position = 2)
+	default boolean moonsBloodRain()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsIcicles", name = "Icicles", description = "Mark the tiles icicles hit, with a tick countdown", section = moons, position = 3)
+	default boolean moonsIcicles()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsTornados", name = "Tornadoes", description = "Mark the Blue Moon's tornadoes", section = moons, position = 4)
+	default boolean moonsTornados()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsEclipse", name = "Eclipse true tile", description = "Outline the true tile of the Eclipse Moon and its orb", section = moons, position = 5)
+	default boolean moonsEclipse()
+	{
+		return true;
+	}
+
+	@net.runelite.client.config.Range(min = 1, max = 5)
+	@ConfigItem(keyName = "moonsMoveAt", name = "Say MOVE at (ticks left)", description = "Countdowns turn red with MOVE at this many ticks left (it hits as the last tick ends)", section = moons, position = 6)
+	default int moonsMoveAt()
+	{
+		return 2;
+	}
+
 	@ConfigSection(name = "Debug", description = "For fixing a boss that doesn't work", position = 30, closedByDefault = true)
 	String debug = "debug";
 
