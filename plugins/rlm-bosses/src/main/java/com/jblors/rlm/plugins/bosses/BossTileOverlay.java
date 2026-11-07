@@ -51,7 +51,7 @@ class BossTileOverlay extends Overlay
 	{
 		// Only near an enabled boss
 		List<Boss> here = new ArrayList<>();
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : plugin.getTracked())
 		{
 			Boss b = plugin.bossOf(npc);
 			if (b != null && !here.contains(b))
@@ -84,7 +84,7 @@ class BossTileOverlay extends Overlay
 				underAttack = true;
 			}
 		}
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : plugin.getTracked())
 		{
 			boolean danger = false;
 			for (Boss b : here)
@@ -116,7 +116,25 @@ class BossTileOverlay extends Overlay
 				tiles.add(e.getKey());
 			}
 		}
-		for (GraphicsObject go : client.getTopLevelWorldView().getGraphicsObjects())
+		// Graphics from the top-level world view and from the bosses' own world views
+		java.util.Set<net.runelite.api.WorldView> views = new java.util.LinkedHashSet<>();
+		views.add(client.getTopLevelWorldView());
+		for (NPC npc : plugin.getTracked())
+		{
+			if (npc.getWorldView() != null)
+			{
+				views.add(npc.getWorldView());
+			}
+		}
+		java.util.List<GraphicsObject> graphics = new ArrayList<>();
+		for (net.runelite.api.WorldView v : views)
+		{
+			for (GraphicsObject go : v.getGraphicsObjects())
+			{
+				graphics.add(go);
+			}
+		}
+		for (GraphicsObject go : graphics)
 		{
 			if (go.finished() || go.getLocation() == null)
 			{

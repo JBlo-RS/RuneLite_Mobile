@@ -58,6 +58,9 @@ public class BossHelperPlugin extends Plugin
 	@Inject
 	private ConfigManager configManager;
 
+	@Inject
+	private net.runelite.client.callback.ClientThread clientThread;
+
 	// ------------------------------------------------------------ attack warnings (overhead text)
 
 	/** The boss that just announced an attack, what it said, and when */
@@ -118,7 +121,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onClientTick(net.runelite.api.events.ClientTick e)
 	{
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : tracked)
 		{
 			Boss b = bossOf(npc);
 			if (b == null || b.def.tells.isEmpty())
@@ -143,7 +146,7 @@ public class BossHelperPlugin extends Plugin
 			return;
 		}
 		String name = Text.removeTags(e.getName());
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : tracked)
 		{
 			Boss b = bossOf(npc);
 			if (b != null && !b.def.tells.isEmpty() && name.equalsIgnoreCase(npc.getName()))
@@ -200,6 +203,74 @@ public class BossHelperPlugin extends Plugin
 		tellKey = null;
 	}
 
+	/**
+	 * Bosses and floor-hazard NPCs that are here, from spawn/despawn events. Not a loop over the
+	 * top-level world view's NPCs: newer fights (Brutus) run in their own world view, whose NPCs
+	 * aren't in that list, though their events still arrive.
+	 */
+	private final Set<NPC> tracked = ConcurrentHashMap.newKeySet();
+
+	Set<NPC> getTracked()
+	{
+		return tracked;
+	}
+
+	private boolean isDangerNpc(int id)
+	{
+		for (Boss b : Boss.values())
+		{
+			if (b.def.dangerNpcs.contains(id) && config.enabled(b))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private void track(NPC npc)
+	{
+		if (bossOf(npc) != null || isDangerNpc(npc.getId()))
+		{
+			tracked.add(npc);
+		}
+		else
+		{
+			tracked.remove(npc);
+		}
+	}
+
+	/** Every NPC in the top-level world view and in the world views inside it. */
+	private java.util.List<NPC> allNpcs()
+	{
+		java.util.List<NPC> out = new java.util.ArrayList<>();
+		net.runelite.api.WorldView top = client.getTopLevelWorldView();
+		if (top == null)
+		{
+			return out;
+		}
+		for (NPC n : top.npcs())
+		{
+			out.add(n);
+		}
+		for (net.runelite.api.WorldEntity we : top.worldEntities())
+		{
+			if (we.getWorldView() != null)
+			{
+				for (NPC n : we.getWorldView().npcs())
+				{
+					out.add(n);
+				}
+			}
+		}
+		return out;
+	}
+
+	@Subscribe
+	public void onNpcDespawned(net.runelite.api.events.NpcDespawned e)
+	{
+		tracked.remove(e.getNpc());
+	}
+
 	/** The prayer against the last attack seen; until a different one comes or the boss is gone. */
 	private volatile Style style;
 
@@ -227,6 +298,17 @@ public class BossHelperPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		// Started mid-fight: pick up what's already there (spawn events come later only for new ones)
+		clientThread.invoke(() ->
+		{
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				for (NPC n : allNpcs())
+				{
+					track(n);
+				}
+			}
+		});
 		overlayManager.add(prayerOverlay);
 		overlayManager.add(tileOverlay);
 		overlayManager.add(tellOverlay);
@@ -238,6 +320,7 @@ public class BossHelperPlugin extends Plugin
 		overlayManager.remove(prayerOverlay);
 		overlayManager.remove(tileOverlay);
 		overlayManager.remove(tellOverlay);
+		tracked.clear();
 		warning = null;
 		style = null;
 		objects.clear();
@@ -365,6 +448,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcChanged(NpcChanged e)
 	{
+		track(e.getNpc());
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
 			debug("changed:" + e.getNpc().getId(), "changed to " + describe(e.getNpc()));
@@ -375,6 +459,7 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onNpcSpawned(NpcSpawned e)
 	{
+		track(e.getNpc());
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
 			debug("spawn:" + e.getNpc().getId(), "spawned " + describe(e.getNpc()) + " at " + e.getNpc().getWorldLocation());
@@ -423,7 +508,7 @@ public class BossHelperPlugin extends Plugin
 		debugTick();
 		Player me = client.getLocalPlayer();
 		boolean present = false;
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : tracked)
 		{
 			Boss b = bossOf(npc);
 			if (b == null || npc.isDead())
@@ -491,6 +576,10 @@ public class BossHelperPlugin extends Plugin
 		{
 			style = null;
 			lingering.clear();
+			if (e.getGameState() == GameState.LOGIN_SCREEN || e.getGameState() == GameState.HOPPING)
+			{
+				tracked.clear();
+			}
 		}
 		if (e.getGameState() == GameState.LOADING)
 		{
