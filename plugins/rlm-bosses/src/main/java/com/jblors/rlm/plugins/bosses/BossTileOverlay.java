@@ -31,6 +31,8 @@ import net.runelite.client.ui.overlay.OverlayUtil;
 class BossTileOverlay extends Overlay
 {
 	private static final Font WARN_FONT = new Font("Dialog", Font.BOLD, 16);
+	private static final java.awt.Color CHARGE = new java.awt.Color(255, 165, 0, 220);
+	private static final java.awt.Color CHARGE_FILL = new java.awt.Color(255, 165, 0, 80);
 
 	private final Client client;
 	private final BossHelperPlugin plugin;
@@ -161,7 +163,29 @@ class BossTileOverlay extends Overlay
 				tiles.add(p.getTarget());
 			}
 		}
-		if (tiles.isEmpty() && areas.isEmpty())
+		// Predicted from an attack's animation (Brutus): converted in the boss's own world view
+		java.util.List<BossHelperPlugin.Predicted> predicted = plugin.getPredicted();
+		for (BossHelperPlugin.Predicted p : predicted)
+		{
+			net.runelite.api.WorldView wv = p.npc.getWorldView() != null ? p.npc.getWorldView() : client.getTopLevelWorldView();
+			net.runelite.api.coords.WorldPoint myWp = me == null ? null : me.getWorldLocation();
+			for (net.runelite.api.coords.WorldPoint wp : p.tiles)
+			{
+				LocalPoint lp = LocalPoint.fromWorld(wv, wp);
+				Polygon poly = lp == null ? null : Perspective.getCanvasTilePoly(client, lp);
+				if (poly != null)
+				{
+					OverlayUtil.renderPolygon(g, poly, p.charge ? CHARGE : config.tileOutline(),
+						p.charge ? CHARGE_FILL : config.tileFill(), new BasicStroke(2));
+				}
+				if (wp.equals(myWp))
+				{
+					underAttack = true;
+				}
+			}
+		}
+
+		if (tiles.isEmpty() && areas.isEmpty() && predicted.isEmpty())
 		{
 			return null;
 		}

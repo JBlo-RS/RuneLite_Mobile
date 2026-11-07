@@ -244,6 +244,39 @@ public class BossHelperPlugin extends Plugin
 	private final Map<NPC, Integer> lastSeen = new ConcurrentHashMap<>();
 	private static final int GONE_AFTER_TICKS = 50;
 
+	/** Tiles predicted from an attack's animation (Brutus' stomp and charge), until a game tick */
+	static final class Predicted
+	{
+		final java.util.List<net.runelite.api.coords.WorldPoint> tiles;
+		final NPC npc;
+		final int until;
+		final boolean charge;
+
+		Predicted(java.util.List<net.runelite.api.coords.WorldPoint> tiles, NPC npc, int until, boolean charge)
+		{
+			this.tiles = tiles;
+			this.npc = npc;
+			this.until = until;
+			this.charge = charge;
+		}
+	}
+
+	private volatile Predicted stompTiles, chargeTiles;
+
+	java.util.List<Predicted> getPredicted()
+	{
+		java.util.List<Predicted> out = new java.util.ArrayList<>(2);
+		int now = client.getTickCount();
+		for (Predicted p : new Predicted[]{stompTiles, chargeTiles})
+		{
+			if (p != null && p.until >= now)
+			{
+				out.add(p);
+			}
+		}
+		return out;
+	}
+
 	/** What the prayer overlay last did, for the debug status line */
 	volatile String prayerUi = "-";
 
@@ -366,6 +399,7 @@ public class BossHelperPlugin extends Plugin
 		overlayManager.remove(tileOverlay);
 		overlayManager.remove(tellOverlay);
 		tracked.clear();
+		stompTiles = chargeTiles = null;
 		warning = null;
 		style = null;
 		objects.clear();
@@ -496,6 +530,20 @@ public class BossHelperPlugin extends Plugin
 		}
 		seen((NPC) e.getActor());
 		tellAttack(b, e.getActor(), e.getActor().getAnimation());
+		if (b == Boss.BRUTUS)
+		{
+			int anim = e.getActor().getAnimation();
+			NPC npc = (NPC) e.getActor();
+			int now = client.getTickCount();
+			if (anim == BrutusTiles.ANIM_STOMP)
+			{
+				stompTiles = new Predicted(BrutusTiles.stomp(npc, client.getLocalPlayer()), npc, now + BrutusTiles.STOMP_SHOW_TICKS, false);
+			}
+			else if (anim == BrutusTiles.ANIM_CHARGE)
+			{
+				chargeTiles = new Predicted(BrutusTiles.charge(npc), npc, now + BrutusTiles.CHARGE_SHOW_TICKS, true);
+			}
+		}
 		Style s = b.def.attackAnimations.get(e.getActor().getAnimation());
 		if (s != null)
 		{
@@ -656,6 +704,20 @@ public class BossHelperPlugin extends Plugin
 					seen((NPC) p.getSourceActor());
 				}
 				Style s = b == null ? null : b.def.projectiles.get(p.getId());
+				if (s == null && b == null)
+				{
+					// Fired by something that isn't the boss itself (Demonic Brutus' attacks): any
+					// present boss's projectile counts
+					for (NPC n : tracked)
+					{
+						Boss tb = bossOf(n);
+						if (tb != null && tb.def.projectiles.containsKey(p.getId()))
+						{
+							s = tb.def.projectiles.get(p.getId());
+							break;
+						}
+					}
+				}
 				if (s != null)
 				{
 					style = s;
