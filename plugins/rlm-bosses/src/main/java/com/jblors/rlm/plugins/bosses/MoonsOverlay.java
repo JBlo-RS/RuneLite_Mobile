@@ -99,6 +99,10 @@ class MoonsOverlay extends Overlay
 					}
 					break;
 				case ECLIPSE:
+					if (config.moonsEclipseClones() && moons.clonePhase())
+					{
+						break; // clone phase: the tile to step to (below) instead of the bosses
+					}
 					if (config.moonsEclipse())
 					{
 						OverlayUtil.renderPolygon(g, poly, ECLIPSE, new Color(0, 0, 0, 0), new BasicStroke(3));
@@ -108,6 +112,27 @@ class MoonsOverlay extends Overlay
 					break;
 			}
 		}
+		// Eclipse clone phase: the tile next to the player in the direction the latest one appeared
+		NPC latest = moons.latestEclipse();
+		if (config.moonsEclipseClones() && me != null && mine != null && latest != null && moons.clonePhase()
+			&& latest.getWorldLocation() != null)
+		{
+			WorldPoint nw = latest.getWorldLocation();
+			int size = latest.getComposition() == null ? 1 : Math.max(1, latest.getComposition().getSize());
+			int[] d = MoonsTracker.direction(mine.getX(), mine.getY(), nw.getX(), nw.getY(), size);
+			if (d[0] != 0 || d[1] != 0)
+			{
+				WorldPoint step = new WorldPoint(mine.getX() + d[0], mine.getY() + d[1], mine.getPlane());
+				net.runelite.api.WorldView wv = me.getWorldView() != null ? me.getWorldView() : client.getTopLevelWorldView();
+				net.runelite.api.coords.LocalPoint lp = net.runelite.api.coords.LocalPoint.fromWorld(wv, step);
+				Polygon p = lp == null ? null : net.runelite.api.Perspective.getCanvasTilePoly(client, lp);
+				if (p != null)
+				{
+					OverlayUtil.renderPolygon(g, p, ECLIPSE, new Color(0, 230, 255, 90), new BasicStroke(3));
+				}
+			}
+		}
+
 		// Blue Moon's ice on the floor: graphics VFX_DJINN_ICE_FLOOR_SPAWN/_IDLE/_ATTACK_01, while there
 		if (config.moonsIceFloor())
 		{

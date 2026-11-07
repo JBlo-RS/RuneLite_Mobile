@@ -25,6 +25,8 @@ final class MoonsTracker
 	static final int ICICLE_1 = 13022, ICICLE_2 = 13023, ICICLE_3 = 13024;
 	static final int WINTER_STORM = 13027, ECLIPSE_SHIELD = 13020;
 	static final int ECLIPSE_MOON_VIS = 13012, ECLIPSE_MOON = 13018, ECLIPSE_ENRAGED = 13487;
+	/** NpcID.PMOON_BOSS_ECLIPSE_CLONE */
+	static final int ECLIPSE_CLONE = 13019;
 	static final int DEFAULT_LIFETIME = 4;
 
 	enum Kind
@@ -59,6 +61,7 @@ final class MoonsTracker
 			case ECLIPSE_MOON_VIS:
 			case ECLIPSE_MOON:
 			case ECLIPSE_ENRAGED:
+			case ECLIPSE_CLONE:
 			case ECLIPSE_SHIELD:
 				return Kind.ECLIPSE;
 			default:
@@ -86,12 +89,83 @@ final class MoonsTracker
 		learn(o.getId(), t0, tick);
 	}
 
+	/** The Eclipse Moon or clone that appeared last (for the clone phase), and when */
+	volatile NPC lastEclipse;
+	volatile int lastEclipseTick;
+
 	void npcSpawned(NPC n, int tick)
 	{
 		if (kindOfNpc(n.getId()) != null)
 		{
-			npcs.putIfAbsent(n, tick);
+			if (npcs.putIfAbsent(n, tick) == null && isEclipseBody(n.getId()))
+			{
+				lastEclipse = n;
+				lastEclipseTick = tick;
+			}
 		}
+	}
+
+	/** The moon itself or a clone of it (not its Moon Shield orb). */
+	static boolean isEclipseBody(int id)
+	{
+		return id == ECLIPSE_MOON_VIS || id == ECLIPSE_MOON || id == ECLIPSE_ENRAGED || id == ECLIPSE_CLONE;
+	}
+
+	/** The Eclipse Moon or clone that appeared last and is still here, else null. */
+	NPC latestEclipse()
+	{
+		NPC last = lastEclipse;
+		if (last != null && npcs.containsKey(last))
+		{
+			return last;
+		}
+		NPC best = null;
+		int bestTick = Integer.MIN_VALUE;
+		for (Map.Entry<NPC, Integer> e : npcs.entrySet())
+		{
+			if (isEclipseBody(e.getKey().getId()) && e.getValue() > bestTick)
+			{
+				best = e.getKey();
+				bestTick = e.getValue();
+			}
+		}
+		return best;
+	}
+
+	/** The clone phase: a clone is here, or more than one Eclipse Moon. */
+	boolean clonePhase()
+	{
+		int bodies = 0;
+		for (NPC n : npcs.keySet())
+		{
+			if (n.getId() == ECLIPSE_CLONE)
+			{
+				return true;
+			}
+			if (isEclipseBody(n.getId()))
+			{
+				bodies++;
+			}
+		}
+		return bodies > 1;
+	}
+
+	/**
+	 * The direction {dx, dy} (each -1..1) from the player's tile to an NPC's centre, rounded to
+	 * one of 8 directions.
+	 */
+	static int[] direction(int px, int py, int nx, int ny, int size)
+	{
+		// doubled so the centre of an even-sized NPC stays whole
+		int vx = 2 * nx + size - 1 - 2 * px, vy = 2 * ny + size - 1 - 2 * py;
+		if (vx == 0 && vy == 0)
+		{
+			return new int[]{0, 0};
+		}
+		double a = Math.atan2(vy, vx); // 0 = east, counter-clockwise
+		int sector = (int) Math.round(a / (Math.PI / 4)); // -4..4
+		int[][] dirs = {{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}};
+		return dirs[((sector % 8) + 8) % 8];
 	}
 
 	void npcDespawned(NPC n, int tick)

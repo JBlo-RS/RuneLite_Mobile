@@ -60,8 +60,14 @@ public interface BossHelperConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(keyName = "moonsEclipseClones", name = "Eclipse clones: step tile", description = "In the Eclipse Moon's clone phase, mark the tile next to you in the direction the latest one appeared (instead of outlining the bosses)", section = moons, position = 6)
+	default boolean moonsEclipseClones()
+	{
+		return true;
+	}
+
 	@net.runelite.client.config.Range(min = 1, max = 5)
-	@ConfigItem(keyName = "moonsMoveAt", name = "Say MOVE at (ticks left)", description = "Countdowns count down to this many ticks left, then say MOVE (it hits as the last tick ends)", section = moons, position = 6)
+	@ConfigItem(keyName = "moonsMoveAt", name = "Say MOVE at (ticks left)", description = "Countdowns count down to this many ticks left, then say MOVE (it hits as the last tick ends)", section = moons, position = 7)
 	default int moonsMoveAt()
 	{
 		return 2;
