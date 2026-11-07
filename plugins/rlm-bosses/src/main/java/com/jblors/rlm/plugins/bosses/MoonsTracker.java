@@ -18,9 +18,13 @@ final class MoonsTracker
 {
 	// ObjectID: PMOON_BOSS_BLOOD_POOL, _BLOOD_POOL_HARD, _BLOOD_RAIN
 	static final int BLOOD_POOL = 51046, BLOOD_POOL_HARD = 52991, BLOOD_RAIN = 51045;
-	// NpcID: PMOON_BOSS_ICICLE_1-3, _ICICLE_UNCRACKED, _ICICLE_CRACKED, _WINTER_STORM, _ECLIPSE_MOON, _ECLIPSE_MOON_SHIELD
-	static final int ICICLE_1 = 13022, ICICLE_2 = 13023, ICICLE_3 = 13024, ICICLE_UNCRACKED = 13025, ICICLE_CRACKED = 13026;
-	static final int WINTER_STORM = 13027, ECLIPSE_MOON = 13018, ECLIPSE_SHIELD = 13020;
+	// NpcID: PMOON_BOSS_ICICLE_1-3 (13025 _ICICLE_UNCRACKED is "Frozen weapons" and 13026 "Cracked
+	// ice": not hazards), _WINTER_STORM; the Eclipse Moon as seen in a fight log (_ECLIPSE_MOON_VIS
+	// 13012, "Enraged Eclipse Moon" PMOON_ECLIPSE_BOSS_INVIS 13487) and _ECLIPSE_MOON 13018, and
+	// its orb, "Moon Shield" _ECLIPSE_MOON_SHIELD
+	static final int ICICLE_1 = 13022, ICICLE_2 = 13023, ICICLE_3 = 13024;
+	static final int WINTER_STORM = 13027, ECLIPSE_SHIELD = 13020;
+	static final int ECLIPSE_MOON_VIS = 13012, ECLIPSE_MOON = 13018, ECLIPSE_ENRAGED = 13487;
 	static final int DEFAULT_LIFETIME = 4;
 
 	enum Kind
@@ -49,12 +53,12 @@ final class MoonsTracker
 			case ICICLE_1:
 			case ICICLE_2:
 			case ICICLE_3:
-			case ICICLE_UNCRACKED:
-			case ICICLE_CRACKED:
 				return Kind.ICICLE;
 			case WINTER_STORM:
 				return Kind.TORNADO;
+			case ECLIPSE_MOON_VIS:
 			case ECLIPSE_MOON:
+			case ECLIPSE_ENRAGED:
 			case ECLIPSE_SHIELD:
 				return Kind.ECLIPSE;
 			default:

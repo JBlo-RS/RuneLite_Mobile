@@ -82,7 +82,9 @@ enum Boss
 		.objects(55209)), // HUEY_ATTACK_TILES_LOC
 
 	// No prayers here (they don't work at the Moons); hazards are in MoonsTracker / MoonsOverlay
-	MOONS_OF_PERIL("Moons of Peril", npcs(13016, 13017, 13018, 13019)), // PMOON_BOSS_BLOOD/BLUE/ECLIPSE_MOON, _ECLIPSE_CLONE
+	// Seen in a fight log: _BLOOD/_ECLIPSE/_BLUE_MOON_VIS 13011-13013 and the "Enraged" moons
+	// PMOON_*_BOSS_INVIS 13485-13487; also PMOON_BOSS_BLOOD/BLUE/ECLIPSE_MOON 13016-13018, _ECLIPSE_CLONE
+	MOONS_OF_PERIL("Moons of Peril", npcs(13011, 13012, 13013, 13016, 13017, 13018, 13019, 13485, 13486, 13487)),
 
 	GALVEK("Galvek", npcs(8094, 8095, 8096, 8097, 8098) // GALVEK_WAVES/FIRE/WATER/WIND/EARTH
 		.projectile(RANGED, 1489).projectile(MAGIC, 1490) // GALVEK_RANGED_TRAVEL, _MAGIC_TRAVEL
