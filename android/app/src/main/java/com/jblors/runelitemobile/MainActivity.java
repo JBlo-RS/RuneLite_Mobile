@@ -482,7 +482,9 @@ public class MainActivity extends Activity {
         StringBuilder out = new StringBuilder();
         int header = 0;
         for (String line : readLog().split("\n")) {
-            if (header < 6 || line.contains("rlm-boss:")) {
+            // The fight record, plus RuneLite's error lines about this app's plugins
+            if (header < 6 || line.contains("rlm-boss:") || line.contains("jblors.rlm.plugins")
+                    || (line.contains("Exception") && line.contains("rlm"))) {
                 out.append(line).append('\n');
                 header++;
             }

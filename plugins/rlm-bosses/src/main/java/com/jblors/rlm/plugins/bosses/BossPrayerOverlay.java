@@ -63,6 +63,7 @@ class BossPrayerOverlay extends Overlay
 		if (config.prayerBook())
 		{
 			Widget w = prayerButton(style);
+			plugin.prayerUi = w == null ? "prayer button not found" : w.isHidden() ? "closed" : "box shown";
 			if (w != null && !w.isHidden())
 			{
 				Rectangle b = w.getBounds();

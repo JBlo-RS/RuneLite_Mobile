@@ -121,6 +121,18 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onClientTick(net.runelite.api.events.ClientTick e)
 	{
+		try
+		{
+			readOverheads();
+		}
+		catch (RuntimeException ex)
+		{
+			error("client tick", ex);
+		}
+	}
+
+	private void readOverheads()
+	{
 		for (NPC npc : tracked)
 		{
 			Boss b = bossOf(npc);
@@ -170,6 +182,7 @@ public class BossHelperPlugin extends Plugin
 			return; // the same announcement seen another way
 		}
 		debug("say:" + idOf(a) + ":" + text, describe(a) + " says '" + text + "' (" + via + ")");
+		seen((NPC) a);
 		tellNpc = (NPC) a;
 		tellText = Text.removeTags(text);
 		tellKey = key;
@@ -227,15 +240,41 @@ public class BossHelperPlugin extends Plugin
 		return false;
 	}
 
+	/** When each tracked NPC was last seen (any event or list): bosses not seen for a while are gone */
+	private final Map<NPC, Integer> lastSeen = new ConcurrentHashMap<>();
+	private static final int GONE_AFTER_TICKS = 50;
+
+	/** What the prayer overlay last did, for the debug status line */
+	volatile String prayerUi = "-";
+
+	private void seen(NPC npc)
+	{
+		tracked.add(npc);
+		lastSeen.put(npc, client.getTickCount());
+	}
+
 	private void track(NPC npc)
 	{
 		if (bossOf(npc) != null || isDangerNpc(npc.getId()))
 		{
-			tracked.add(npc);
+			seen(npc);
 		}
 		else
 		{
 			tracked.remove(npc);
+		}
+	}
+
+	private void error(String where, RuntimeException ex)
+	{
+		if (logged.add("error:" + where + ":" + ex))
+		{
+			System.out.println("rlm-boss: error in " + where + ": " + ex);
+			StackTraceElement[] st = ex.getStackTrace();
+			for (int i = 0; i < Math.min(6, st.length); i++)
+			{
+				System.out.println("rlm-boss:     at " + st[i]);
+			}
 		}
 	}
 
@@ -248,17 +287,23 @@ public class BossHelperPlugin extends Plugin
 		{
 			return out;
 		}
-		for (NPC n : top.npcs())
+		if (top.npcs() != null)
 		{
-			out.add(n);
-		}
-		for (net.runelite.api.WorldEntity we : top.worldEntities())
-		{
-			if (we.getWorldView() != null)
+			for (NPC n : top.npcs())
 			{
-				for (NPC n : we.getWorldView().npcs())
+				out.add(n);
+			}
+		}
+		if (top.worldEntities() != null)
+		{
+			for (net.runelite.api.WorldEntity we : top.worldEntities())
+			{
+				if (we != null && we.getWorldView() != null && we.getWorldView().npcs() != null)
 				{
-					out.add(n);
+					for (NPC n : we.getWorldView().npcs())
+					{
+						out.add(n);
+					}
 				}
 			}
 		}
@@ -425,6 +470,18 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged e)
 	{
+		try
+		{
+			animationChanged(e);
+		}
+		catch (RuntimeException ex)
+		{
+			error("animation", ex);
+		}
+	}
+
+	private void animationChanged(AnimationChanged e)
+	{
 		if (config.debugLog() && e.getActor() instanceof NPC && e.getActor().getAnimation() != -1
 			&& near(e.getActor().getWorldLocation()))
 		{
@@ -437,6 +494,7 @@ public class BossHelperPlugin extends Plugin
 		{
 			return;
 		}
+		seen((NPC) e.getActor());
 		tellAttack(b, e.getActor(), e.getActor().getAnimation());
 		Style s = b.def.attackAnimations.get(e.getActor().getAnimation());
 		if (s != null)
@@ -505,7 +563,40 @@ public class BossHelperPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick e)
 	{
+		try
+		{
+			gameTick();
+		}
+		catch (RuntimeException ex)
+		{
+			error("game tick", ex);
+		}
+	}
+
+	private void gameTick()
+	{
 		debugTick();
+		int tickNow = client.getTickCount();
+		// Bosses in any world view we can list; and forget ones not seen for a while
+		for (NPC n : allNpcs())
+		{
+			if (bossOf(n) != null || isDangerNpc(n.getId()))
+			{
+				seen(n);
+			}
+		}
+		tracked.removeIf(n -> tickNow - lastSeen.getOrDefault(n, tickNow) > GONE_AFTER_TICKS);
+		lastSeen.keySet().retainAll(tracked);
+		if (config.debugLog() && (!tracked.isEmpty() || style != null) && tickNow % 10 == 0)
+		{
+			StringBuilder ids = new StringBuilder();
+			for (NPC n : tracked)
+			{
+				ids.append(n.getId()).append(n.isDead() ? "(dead) " : " ");
+			}
+			debug("status:" + tickNow, "status: tracking [" + ids.toString().trim() + "], prayer " + style
+				+ ", prayer tab: " + prayerUi + ", warning " + warning);
+		}
 		Player me = client.getLocalPlayer();
 		boolean present = false;
 		for (NPC npc : tracked)
@@ -560,6 +651,10 @@ public class BossHelperPlugin extends Plugin
 					continue;
 				}
 				Boss b = bossOf(p.getSourceActor());
+				if (b != null)
+				{
+					seen((NPC) p.getSourceActor());
+				}
 				Style s = b == null ? null : b.def.projectiles.get(p.getId());
 				if (s != null)
 				{
