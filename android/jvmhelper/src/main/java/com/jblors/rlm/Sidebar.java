@@ -19,9 +19,10 @@ public final class Sidebar {
     /**
      * Opens RuneLite's sidebar if it is closed. The mobile layout keeps it open (off screen,
      * shown by the slide-in panel) so the game canvas keeps the phone's shape; a closed sidebar
-     * makes the canvas wider and the phone shows black bars. Uses RuneLite's own sidebar hotkey
-     * (default Ctrl+F11) so ClientUI does its usual work; RuneLite only handles it while its
-     * window is focused. Retries at most every 2 s.
+     * makes the canvas wider and the phone shows black bars. Calls RuneLite's own
+     * ClientUI.toggleSidebar(true, false), so ClientUI does its usual work (remembers it's open,
+     * activates the panel). No key is sent: a sidebar hotkey (Ctrl+F11) that RuneLite didn't take
+     * went on to the game, where F11 opens a tab (the emotes), every 2 s. Retries at most every 2 s.
      */
     public static void ensureOpen() {
         EventQueue.invokeLater(() -> {
@@ -31,18 +32,35 @@ public final class Sidebar {
             if (now - lastOpenAttempt < 2000) return;
             lastOpenAttempt = now;
             java.awt.Window w = javax.swing.SwingUtilities.getWindowAncestor(tabs);
-            if (w == null) return;
-            if (!w.isFocused()) w.requestFocus();
-            Component target = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-            if (target == null) target = w;
-            java.awt.EventQueue q = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue();
-            int ctrl = java.awt.event.InputEvent.CTRL_DOWN_MASK;
-            q.postEvent(new java.awt.event.KeyEvent(target, java.awt.event.KeyEvent.KEY_PRESSED, now, ctrl,
-                    java.awt.event.KeyEvent.VK_F11, java.awt.event.KeyEvent.CHAR_UNDEFINED));
-            q.postEvent(new java.awt.event.KeyEvent(target, java.awt.event.KeyEvent.KEY_RELEASED, now, ctrl,
-                    java.awt.event.KeyEvent.VK_F11, java.awt.event.KeyEvent.CHAR_UNDEFINED));
-            System.out.println("rlm-sidebar: was closed, sent the sidebar hotkey");
+            String how;
+            try {
+                openWithClientUi(w);
+                how = "opened it through RuneLite";
+            } catch (ReflectiveOperationException | RuntimeException ex) {
+                // Last resort: show it ourselves (ClientUI's state catches up on its next toggle)
+                tabs.setVisible(true);
+                if (tabs.getParent() != null) tabs.getParent().revalidate();
+                how = "opened it directly (" + ex + ")";
+            }
+            System.out.println("rlm-sidebar: was closed, " + how + (tabs.isVisible() ? "" : ", but it's still closed"));
         });
+    }
+
+    /** RuneLite's ClientUI (a singleton in RuneLite's injector) opens its sidebar. */
+    private static void openWithClientUi(java.awt.Window w) throws ReflectiveOperationException {
+        ClassLoader cl = w != null ? w.getClass().getClassLoader() : Thread.currentThread().getContextClassLoader();
+        Class<?> runelite = Class.forName("net.runelite.client.RuneLite", false, cl);
+        java.lang.reflect.Field f = runelite.getDeclaredField("injector");
+        f.setAccessible(true);
+        Object injector = f.get(null);
+        if (injector == null) throw new IllegalStateException("RuneLite has no injector yet");
+        Class<?> clientUi = Class.forName("net.runelite.client.ui.ClientUI", false, runelite.getClassLoader());
+        // Through Guice's public Injector interface (the injector's own class isn't public)
+        Class<?> injectorType = Class.forName("com.google.inject.Injector", false, runelite.getClassLoader());
+        Object ui = injectorType.getMethod("getInstance", Class.class).invoke(injector, clientUi);
+        java.lang.reflect.Method toggle = clientUi.getDeclaredMethod("toggleSidebar", boolean.class, boolean.class);
+        toggle.setAccessible(true);
+        toggle.invoke(ui, true, false);
     }
 
     /** Selects the sidebar tab with this tooltip (event thread); no-op if not found. */
