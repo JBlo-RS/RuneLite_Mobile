@@ -27,7 +27,7 @@ Run the stock RuneLite client on Android (ARM64), PojavLauncher-style:
 
 ## Trying the APK
 
-1. Download `apk/runelite-mobile-0.21.5-debug.apk` on the phone (ARM64, Android 8+)
+1. Download `apk/runelite-mobile-0.21.6-debug.apk` on the phone (ARM64, Android 8+)
    and install it. Allow installs from your browser/files app when asked.
 2. Open **RuneLite Mobile** and tap **Run JVM probe**. The first run unpacks the JRE,
    which takes a few seconds.
@@ -66,6 +66,9 @@ RuneLite in developer mode loads every jar in `~/.runelite/sideloaded-plugins`. 
 
 - **Built in:** the plugins in `plugins/` are compiled by `tools/build-plugins.sh` into
   `android/app/plugins/*.jar`, bundled with the APK, and installed before each Developer mode start.
+  Their names are shown in cyan at the top of RuneLite's plugin list (below any pinned plugins):
+  each name starts with `<html><font color=...>`, which the list displays as colour and sorts
+  before any letter.
 - **Import:** More → **Plugins** → **Import .jar** copies a plugin jar from the phone (e.g. Downloads).
   Imported plugins can be removed from the same list.
 - Plugins are ordinary desktop RuneLite plugin jars (Java 11 bytecode). They run unchanged,

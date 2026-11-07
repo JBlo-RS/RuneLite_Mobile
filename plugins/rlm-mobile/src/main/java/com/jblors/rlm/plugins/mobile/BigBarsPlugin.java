@@ -8,7 +8,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
-	name = "Big Status Bars",
+	name = RlmName.PREFIX + "Big Status Bars",
 	description = "Large Hitpoints and Prayer bars (optionally special attack and run energy), easy to read on a phone",
 	tags = {"mobile", "hitpoints", "hp", "prayer", "bars", "special", "run", "rlm"}
 )

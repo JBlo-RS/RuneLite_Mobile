@@ -31,7 +31,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Text;
 
 @PluginDescriptor(
-	name = "Boss Helper",
+	name = RlmName.PREFIX + "Boss Helper",
 	description = "Shows the prayer against bosses' attacks and marks tiles about to be hit (Scurrius, Jad, Dagannoth Kings, Phantom Muspah, Sarachnis, wilderness bosses)",
 	tags = {"boss", "prayer", "protect", "tiles", "jad", "dks", "muspah", "sarachnis", "scurrius", "fanatic", "archaeologist", "rlm"}
 )

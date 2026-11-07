@@ -37,7 +37,7 @@ import net.runelite.client.util.Text;
  * Only highlights; every click is yours.
  */
 @PluginDescriptor(
-	name = "Skilling Helper",
+	name = RlmName.PREFIX + "Skilling Helper",
 	description = "Outlines the next tree, rock or fishing spot of the kind you're using, or the bank when your inventory is full",
 	tags = {"skilling", "woodcutting", "mining", "fishing", "next", "highlight", "bank", "rlm"}
 )

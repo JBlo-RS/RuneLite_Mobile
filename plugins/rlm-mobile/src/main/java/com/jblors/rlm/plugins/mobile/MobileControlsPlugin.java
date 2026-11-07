@@ -19,7 +19,7 @@ import net.runelite.client.plugins.PluginDescriptor;
  * system properties, which the app reads from the JVM.
  */
 @PluginDescriptor(
-	name = "Mobile Controls",
+	name = RlmName.PREFIX + "Mobile Controls",
 	description = "Lets RuneLite Mobile's Pray/Inv button press your own keybinds for the prayer and inventory tabs",
 	tags = {"mobile", "android", "prayer", "inventory", "keybind", "rlm"}
 )

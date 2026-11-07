@@ -18,7 +18,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
  * on the same row of the game's menu (like stretched mode scales clicks): one tap, one click.
  */
 @PluginDescriptor(
-	name = "Big Menu",
+	name = RlmName.PREFIX + "Big Menu",
 	description = "Draws the right-click menu large enough to tap, and sends your tap to the matching option",
 	tags = {"mobile", "menu", "right click", "touch", "big", "rlm"}
 )
