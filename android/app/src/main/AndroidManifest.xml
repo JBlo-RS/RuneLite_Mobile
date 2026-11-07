@@ -32,5 +32,11 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
             android:windowSoftInputMode="adjustNothing|stateHidden"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode" />
+            <!-- "Share log" sends the log as a file through this (read-only, granted per share) -->
+        <provider
+            android:name=".LogProvider"
+            android:authorities="com.jblors.runelitemobile.logs"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

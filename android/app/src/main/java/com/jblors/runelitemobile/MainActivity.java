@@ -262,7 +262,9 @@ public class MainActivity extends Activity {
         more.addView(moreItem("Plugins", "Local plugins for Developer mode: import a .jar or remove one",
                 v -> showPlugins()));
         more.addView(moreItem("View log", "Output of the last run", v -> showLog()));
-        more.addView(moreItem("Share log", "Send the last run's log", v -> shareLog()));
+        more.addView(moreItem("Share log", "Send the last run's log (as a file)", v -> shareLog()));
+        more.addView(moreItem("Share boss log", "Send only the Boss Helper's fight details (as text)",
+                v -> shareBossLog()));
         more.addView(moreItem("Swing demo", "Test touch, keyboard and drawing", v -> launch(JvmActivity.MODE_SWING_DEMO)));
         more.addView(moreItem("JVM probe", "Test the Java runtime", v -> launch(JvmActivity.MODE_PROBE)));
         more.addView(moreItem("GPU test", "Check whether the GPU plugin could work on this phone",
@@ -459,14 +461,42 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    /** The whole log, as a file attachment (pasted text is too big for most apps). */
     private void shareLog() {
-        String log = readLog();
-        if (log.length() > 200_000) log = log.substring(log.length() - 200_000);
+        if (!JvmActivity.logFile(this).isFile()) {
+            Toast.makeText(this, "No log yet. Press Play first.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        android.net.Uri uri = LogProvider.uri();
         Intent send = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, "RuneLite Mobile log")
-                .putExtra(Intent.EXTRA_TEXT, log);
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        send.setClipData(android.content.ClipData.newRawUri("log", uri));
         startActivity(Intent.createChooser(send, "Share log"));
+    }
+
+    /** Just the device lines and the Boss Helper's fight record, as text. */
+    private void shareBossLog() {
+        StringBuilder out = new StringBuilder();
+        int header = 0;
+        for (String line : readLog().split("\n")) {
+            if (header < 6 || line.contains("rlm-boss:")) {
+                out.append(line).append('\n');
+                header++;
+            }
+        }
+        if (!out.toString().contains("rlm-boss:")) {
+            Toast.makeText(this, "No fight details in the log. Turn on Boss Helper → Debug → "
+                    + "Record fight details, fight, then try again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String text = out.length() > 90_000 ? out.substring(out.length() - 90_000) : out.toString();
+        startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, "RuneLite Mobile boss log")
+                .putExtra(Intent.EXTRA_TEXT, text), "Share boss log"));
     }
 
     // ------------------------------------------------------------ widgets

@@ -119,12 +119,21 @@ public class BossHelperPlugin extends Plugin
 		return me != null && p != null && me.getWorldLocation().distanceTo(p) <= 20;
 	}
 
-	private void debug(String what)
+	/** What has been logged already: each distinct thing once, so a whole fight stays short */
+	private final Set<String> logged = ConcurrentHashMap.newKeySet();
+
+	/** Logs a line the first time its key is seen (e.g. "anim:15627:13783"). */
+	private void debug(String key, String what)
 	{
-		if (config.debugLog() && debugLines++ < 60) // at most 60 lines a tick
+		if (config.debugLog() && logged.size() < 2000 && logged.add(key) && debugLines++ < 60)
 		{
 			System.out.println("rlm-boss: t" + client.getTickCount() + " " + what);
 		}
+	}
+
+	private static String idOf(Actor a)
+	{
+		return a instanceof NPC ? Integer.toString(((NPC) a).getId()) : a == null ? "-" : "player";
 	}
 
 	private static String describe(Actor a)
@@ -148,7 +157,7 @@ public class BossHelperPlugin extends Plugin
 			net.runelite.api.coords.WorldPoint w = net.runelite.api.coords.WorldPoint.fromLocal(client, e.getGraphicsObject().getLocation());
 			if (near(w))
 			{
-				debug("graphics " + e.getGraphicsObject().getId() + " at " + w);
+				debug("gfx:" + e.getGraphicsObject().getId(), "graphics " + e.getGraphicsObject().getId() + " at " + w);
 			}
 		}
 	}
@@ -168,7 +177,8 @@ public class BossHelperPlugin extends Plugin
 				Actor src = p.getSourceActor();
 				if (src != null && src != me && near(src.getWorldLocation()) || p.getTargetActor() == me)
 				{
-					debug("projectile " + p.getId() + " from " + describe(src) + " to "
+					String to = p.getTargetActor() == me ? "you" : p.getTargetActor() != null ? "actor" : "ground";
+					debug("proj:" + p.getId() + ":" + idOf(src) + ":" + to, "projectile " + p.getId() + " from " + describe(src) + " to "
 						+ (p.getTargetActor() == me ? "you" : p.getTargetActor() != null ? describe(p.getTargetActor())
 						: "ground " + p.getTargetPoint()));
 				}
@@ -182,7 +192,8 @@ public class BossHelperPlugin extends Plugin
 		if (config.debugLog() && e.getActor() instanceof NPC && e.getActor().getAnimation() != -1
 			&& near(e.getActor().getWorldLocation()))
 		{
-			debug(describe(e.getActor()) + " animation " + e.getActor().getAnimation()
+			debug("anim:" + idOf(e.getActor()) + ":" + e.getActor().getAnimation(),
+				describe(e.getActor()) + " animation " + e.getActor().getAnimation()
 				+ (e.getActor().getInteracting() == client.getLocalPlayer() ? " (targeting you)" : ""));
 		}
 		Boss b = bossOf(e.getActor());
@@ -202,7 +213,7 @@ public class BossHelperPlugin extends Plugin
 	{
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
-			debug("changed to " + describe(e.getNpc()));
+			debug("changed:" + e.getNpc().getId(), "changed to " + describe(e.getNpc()));
 		}
 		formChange(e.getNpc());
 	}
@@ -212,7 +223,7 @@ public class BossHelperPlugin extends Plugin
 	{
 		if (config.debugLog() && near(e.getNpc().getWorldLocation()))
 		{
-			debug("spawned " + describe(e.getNpc()) + " at " + e.getNpc().getWorldLocation());
+			debug("spawn:" + e.getNpc().getId(), "spawned " + describe(e.getNpc()) + " at " + e.getNpc().getWorldLocation());
 		}
 		formChange(e.getNpc());
 	}
@@ -232,6 +243,10 @@ public class BossHelperPlugin extends Plugin
 	public void onGameObjectSpawned(GameObjectSpawned e)
 	{
 		int id = e.getGameObject().getId();
+		if (config.debugLog() && client.getGameState() == GameState.LOGGED_IN && near(e.getGameObject().getWorldLocation()))
+		{
+			debug("obj:" + id, "object " + id + " at " + e.getGameObject().getWorldLocation());
+		}
 		for (Boss b : Boss.values())
 		{
 			if (b.def.markedObjects.contains(id) && config.enabled(b))
