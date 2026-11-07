@@ -27,6 +27,8 @@ class MoonsOverlay extends Overlay
 	private static final Color MOVE = new Color(255, 30, 30, 240), MOVE_FILL = new Color(255, 30, 30, 90);
 	private static final Color TORNADO = new Color(170, 90, 255, 230), TORNADO_FILL = new Color(170, 90, 255, 50);
 	private static final Color ECLIPSE = new Color(0, 230, 255, 240);
+	private static final Color ICE = new Color(150, 220, 255, 240), ICE_FILL = new Color(150, 220, 255, 80);
+	static final int ICE_FLOOR_SPAWN = 2769, ICE_FLOOR_IDLE = 2770, ICE_FLOOR_ATTACK = 2771;
 
 	private final Client client;
 	private final BossHelperPlugin plugin;
@@ -67,14 +69,14 @@ class MoonsOverlay extends Overlay
 			}
 			int left = moons.ticksLeft(o.getId(), e.getValue(), now);
 			boolean go = left <= config.moonsMoveAt();
-			countdown(g, o.getCanvasTilePoly(), o.getCanvasTextLocation(g, label(left, go), 0), left, go);
+			countdown(g, o.getCanvasTilePoly(), o.getCanvasTextLocation(g, label(left), 0), left);
 			move |= go && mine != null && mine.equals(o.getWorldLocation());
 		}
 		for (Map.Entry<NPC, Integer> e : moons.npcs.entrySet())
 		{
 			NPC n = e.getKey();
 			MoonsTracker.Kind kind = MoonsTracker.kindOfNpc(n.getId());
-			Polygon poly = n.getCanvasTilePoly(); // the NPC's true tile(s), whatever its model does
+			Polygon poly = trueTile(n); // where the game says it is, not where its model is drawn
 			if (poly == null || kind == null)
 			{
 				continue;
@@ -86,7 +88,7 @@ class MoonsOverlay extends Overlay
 					{
 						int left = moons.ticksLeft(n.getId(), e.getValue(), now);
 						boolean go = left <= config.moonsMoveAt();
-						countdown(g, poly, n.getCanvasTextLocation(g, label(left, go), 0), left, go);
+						countdown(g, poly, n.getCanvasTextLocation(g, label(left), 0), left);
 						move |= go && mine != null && mine.equals(n.getWorldLocation());
 					}
 					break;
@@ -106,6 +108,37 @@ class MoonsOverlay extends Overlay
 					break;
 			}
 		}
+		// Blue Moon's ice on the floor: graphics VFX_DJINN_ICE_FLOOR_SPAWN/_IDLE/_ATTACK_01, while there
+		if (config.moonsIceFloor())
+		{
+			java.util.Set<net.runelite.api.WorldView> views = new java.util.LinkedHashSet<>();
+			views.add(client.getTopLevelWorldView());
+			for (NPC n : plugin.getTracked())
+			{
+				if (n.getWorldView() != null)
+				{
+					views.add(n.getWorldView());
+				}
+			}
+			for (net.runelite.api.WorldView v : views)
+			{
+				for (net.runelite.api.GraphicsObject go : v.getGraphicsObjects())
+				{
+					int id = go.getId();
+					if ((id == ICE_FLOOR_SPAWN || id == ICE_FLOOR_IDLE || id == ICE_FLOOR_ATTACK) && !go.finished() && go.getLocation() != null)
+					{
+						Polygon p = net.runelite.api.Perspective.getCanvasTilePoly(client, go.getLocation());
+						if (p != null)
+						{
+							OverlayUtil.renderPolygon(g, p, ICE, ICE_FILL, new BasicStroke(2));
+						}
+						WorldPoint w = WorldPoint.fromLocal(client, go.getLocation());
+						move |= mine != null && mine.equals(w);
+					}
+				}
+			}
+		}
+
 		if (move && me != null)
 		{
 			Point p = me.getCanvasTextLocation(g, "MOVE!", me.getLogicalHeight() + 40);
@@ -117,20 +150,43 @@ class MoonsOverlay extends Overlay
 		return null;
 	}
 
-	private static String label(int left, boolean go)
+	/**
+	 * Centred on the tick to move: counts down (4, 3), says MOVE on the move tick (2 left), and
+	 * after that the tile just stays red with no number (too late to matter).
+	 */
+	private String label(int left)
 	{
-		return go ? left + " MOVE" : Integer.toString(left);
+		int moveAt = config.moonsMoveAt();
+		return left > moveAt ? Integer.toString(left) : left == moveAt ? "MOVE" : "";
 	}
 
-	private static void countdown(Graphics2D g, Polygon poly, Point text, int left, boolean go)
+	private void countdown(Graphics2D g, Polygon poly, Point text, int left)
 	{
+		boolean go = left <= config.moonsMoveAt();
 		if (poly != null)
 		{
 			OverlayUtil.renderPolygon(g, poly, go ? MOVE : WAIT, go ? MOVE_FILL : WAIT_FILL, new BasicStroke(2));
 		}
-		if (text != null)
+		String s = label(left);
+		if (text != null && !s.isEmpty())
 		{
-			OverlayUtil.renderTextLocation(g, text, label(left, go), go ? MOVE : WAIT);
+			OverlayUtil.renderTextLocation(g, text, s, go ? MOVE : WAIT);
 		}
+	}
+
+	/** An NPC's true tile(s): its game location, not its smoothly moving model (as NPC Indicators). */
+	private Polygon trueTile(NPC n)
+	{
+		WorldPoint wp = n.getWorldLocation();
+		net.runelite.api.WorldView wv = n.getWorldView() != null ? n.getWorldView() : client.getTopLevelWorldView();
+		net.runelite.api.coords.LocalPoint lp = wp == null ? null : net.runelite.api.coords.LocalPoint.fromWorld(wv, wp);
+		if (lp == null)
+		{
+			return n.getCanvasTilePoly();
+		}
+		int size = n.getComposition() == null ? 1 : Math.max(1, n.getComposition().getSize());
+		net.runelite.api.coords.LocalPoint centre = lp.plus(net.runelite.api.Perspective.LOCAL_TILE_SIZE * (size - 1) / 2,
+			net.runelite.api.Perspective.LOCAL_TILE_SIZE * (size - 1) / 2);
+		return net.runelite.api.Perspective.getCanvasTileAreaPoly(client, centre, size);
 	}
 }

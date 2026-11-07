@@ -42,7 +42,13 @@ public interface BossHelperConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(keyName = "moonsTornados", name = "Tornadoes", description = "Mark the Blue Moon's tornadoes", section = moons, position = 4)
+	@ConfigItem(keyName = "moonsIceFloor", name = "Ice floor", description = "Mark the Blue Moon's ice on the floor", section = moons, position = 3)
+	default boolean moonsIceFloor()
+	{
+		return true;
+	}
+
+	@ConfigItem(keyName = "moonsTornados", name = "Tornadoes (true tile)", description = "Mark the true tile of the Blue Moon's tornadoes", section = moons, position = 4)
 	default boolean moonsTornados()
 	{
 		return true;
@@ -55,7 +61,7 @@ public interface BossHelperConfig extends Config
 	}
 
 	@net.runelite.client.config.Range(min = 1, max = 5)
-	@ConfigItem(keyName = "moonsMoveAt", name = "Say MOVE at (ticks left)", description = "Countdowns turn red with MOVE at this many ticks left (it hits as the last tick ends)", section = moons, position = 6)
+	@ConfigItem(keyName = "moonsMoveAt", name = "Say MOVE at (ticks left)", description = "Countdowns count down to this many ticks left, then say MOVE (it hits as the last tick ends)", section = moons, position = 6)
 	default int moonsMoveAt()
 	{
 		return 2;
