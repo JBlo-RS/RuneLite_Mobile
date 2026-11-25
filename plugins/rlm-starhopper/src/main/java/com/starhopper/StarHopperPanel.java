@@ -11,6 +11,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
@@ -23,6 +24,7 @@ class StarHopperPanel extends PluginPanel
 	private final StarHopperPlugin plugin;
 	private final JLabel statusLabel = new JLabel();
 	private final JLabel locationLabel = new JLabel();
+	private final JLabel keyLabel = new JLabel();
 	private final JPanel list = new JPanel();
 
 	StarHopperPanel(StarHopperPlugin plugin)
@@ -50,6 +52,34 @@ class StarHopperPanel extends PluginPanel
 
 		header.add(Box.createVerticalStrut(6));
 
+		// The key: saved as soon as Save key is tapped (the settings field saves only when it
+		// loses focus, which on a phone often never happens)
+		JPanel keyRow = new JPanel(new BorderLayout(6, 0));
+		keyRow.setAlignmentX(LEFT_ALIGNMENT);
+		JPasswordField keyField = new JPasswordField();
+		keyField.setToolTipText("Your Star Miners key (/pluginkey in the Star Miners Discord)");
+		JButton saveKey = new JButton("Save key");
+		saveKey.addActionListener(e ->
+		{
+			String k = new String(keyField.getPassword()).trim();
+			if (k.isEmpty())
+			{
+				return; // nothing pasted: keep the key there is
+			}
+			keyField.setText("");
+			plugin.saveKey(k);
+			keyLabel.setText(keyText());
+		});
+		keyRow.add(keyField, BorderLayout.CENTER);
+		keyRow.add(saveKey, BorderLayout.EAST);
+		keyLabel.setFont(FontManager.getRunescapeSmallFont());
+		keyLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		keyLabel.setAlignmentX(LEFT_ALIGNMENT);
+		keyLabel.setText(keyText());
+		header.add(keyLabel);
+		header.add(keyRow);
+		header.add(Box.createVerticalStrut(6));
+
 		JPanel buttons = new JPanel(new GridLayout(1, 2, 6, 0));
 		buttons.setAlignmentX(LEFT_ALIGNMENT); // as the labels, so the header lines up on the left
 		JButton hopBest = new JButton("Hop to best");
@@ -68,8 +98,22 @@ class StarHopperPanel extends PluginPanel
 		update(java.util.Collections.emptyList(), "Loading...", null);
 	}
 
+	private String keyText()
+	{
+		switch (plugin.keySource())
+		{
+			case "saved":
+				return "Key: saved (paste a new one and Save key to replace it)";
+			case "built in":
+				return "Key: built in (paste one to use it instead)";
+			default:
+				return "Key: none yet. Paste yours and tap Save key.";
+		}
+	}
+
 	void update(List<Suggestion> suggestions, String status, String currentLocation)
 	{
+		keyLabel.setText("<html>" + escape(keyText()) + "</html>");
 		statusLabel.setText("<html>" + escape(status) + "</html>");
 		locationLabel.setText(currentLocation == null ? "" : "<html>Current spot: " + escape(currentLocation) + "</html>");
 

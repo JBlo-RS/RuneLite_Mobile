@@ -92,6 +92,9 @@ public class StarHopperPlugin extends Plugin
 	@Inject
 	private Notifier notifier;
 
+	@Inject
+	private ConfigManager configManager;
+
 	private StarHopperPanel panel;
 	private NavigationButton navButton;
 	private ScheduledFuture<?> pollTask;
@@ -99,6 +102,8 @@ public class StarHopperPlugin extends Plugin
 	private volatile List<StarReport> stars = Collections.emptyList();
 	private volatile List<Suggestion> ranked = Collections.emptyList();
 	private volatile String status = "Loading...";
+	/** The last "N of M match" logged, so it's logged when it changes */
+	private String lastCounts;
 	private volatile String currentLocation;
 	private final Map<String, Long> depleted = new ConcurrentHashMap<>();
 
@@ -162,32 +167,58 @@ public class StarHopperPlugin extends Plugin
 		pollTask = executor.scheduleWithFixedDelay(this::poll, 0, seconds, TimeUnit.SECONDS);
 	}
 
+	/**
+	 * Saves the key straight away (the panel's Save key button). The settings' text field only
+	 * saves when it loses focus, which on a phone often never happens.
+	 */
+	void saveKey(String key)
+	{
+		if (key != null && !key.trim().isEmpty())
+		{
+			configManager.setConfiguration(StarHopperConfig.GROUP, "authKey", key.trim());
+		}
+		// onConfigChanged fetches again with it
+	}
+
+	String keySource()
+	{
+		return StarMinersKey.source(config.authKey());
+	}
+
 	void refreshNow()
 	{
 		executor.execute(this::poll);
 	}
 
+	/** Raw responses written to the log so far (the first few, to check the format) */
+	private int rawLogged;
+
 	private void poll()
 	{
-		String key = config.authKey();
-		if (key == null || key.trim().isEmpty())
+		String key = StarMinersKey.effective(config.authKey());
+		String keyFrom = StarMinersKey.source(config.authKey());
+		if (key.isEmpty())
 		{
-			status = "Add your Star Miners key in the plugin settings (Star Miners feed > Authorization key).";
+			status = "Add your Star Miners key: paste it in the box above and tap Save key (get it with /pluginkey in the Star Miners Discord).";
 			recompute();
 			return;
 		}
 		try
 		{
-			List<StarReport> fetched = feed.fetch(config.endpoint(), key, config.debugLogResponse());
+			// The first two responses always go to the log (they hold no key), to check the format
+			boolean logRaw = config.debugLogResponse() || rawLogged < 2;
+			rawLogged++;
+			List<StarReport> fetched = feed.fetch(config.endpoint(), key, logRaw);
 			stars = fetched;
 			status = fetched.isEmpty()
-				? "Connected, but no stars were found in the response. Turn on 'Log raw response' to check the format."
-				: "Updated " + java.time.LocalTime.now().withNano(0) + " · " + fetched.size() + " stars";
+				? "Connected (key " + keyFrom + "), but no stars were found in the response. Turn on 'Log raw response' and share the log."
+				: "Updated " + java.time.LocalTime.now().withNano(0) + " \u00b7 " + fetched.size() + " stars (key " + keyFrom + ")";
+			log.info("Star Hopper: fetched {} stars (key {})", fetched.size(), keyFrom);
 		}
 		catch (Exception e)
 		{
-			log.warn("Star Hopper: failed to fetch stars", e);
-			status = "Fetch failed: " + e.getMessage();
+			log.warn("Star Hopper: failed to fetch stars (key {}): {}", keyFrom, e.toString());
+			status = "Fetch failed (key " + keyFrom + "): " + e.getMessage();
 		}
 		recompute();
 	}
@@ -225,6 +256,16 @@ public class StarHopperPlugin extends Plugin
 
 			ranked = StarRanker.rank(stars, worlds, depleted, config, miningLevel, world, currentLocation,
 				System.currentTimeMillis());
+			if (!stars.isEmpty())
+			{
+				String counts = ranked.size() + " of " + stars.size() + " stars match your filters";
+				if (!counts.equals(lastCounts))
+				{
+					lastCounts = counts;
+					log.info("Star Hopper: {}{}", counts, ranked.isEmpty() ? "" : "; best: W" + ranked.get(0).getStar().getWorld()
+						+ " " + ranked.get(0).getStar().getLocation() + " est. T" + ranked.get(0).getDisplayTier());
+				}
+			}
 			pushToPanel();
 		});
 	}
@@ -237,7 +278,9 @@ public class StarHopperPlugin extends Plugin
 			return;
 		}
 		final List<Suggestion> list = ranked;
-		final String s = status;
+		// e.g. "Updated 18:40 · 52 stars (key built in) · 3 of 52 match your filters"
+		final String s = stars.isEmpty() ? status
+			: status + " \u00b7 " + list.size() + " of " + stars.size() + " match your filters";
 		final String loc = currentLocation;
 		SwingUtilities.invokeLater(() -> p.update(list, s, loc));
 	}

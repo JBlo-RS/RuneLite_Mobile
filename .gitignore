@@ -7,3 +7,6 @@ local.properties
 .externalNativeBuild/
 *.apk
 !apk/*.apk
+
+# A personal Star Miners key built into Star Hopper (never committed)
+plugins/rlm-starhopper/src/main/resources/com/starhopper/starminers.key
