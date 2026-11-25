@@ -101,8 +101,9 @@ public final class ScreenCompositor {
 
     /**
      * Where things are on the virtual screen, or null before the main window exists:
-     * {canvasX, canvasY, canvasW, canvasH, windowX, windowY, windowW, windowH}. The canvas is the
-     * largest heavyweight Canvas (the game) in the maximized window.
+     * {canvasX, canvasY, canvasW, canvasH, windowX, windowY, windowW, windowH[, sidebarX, sidebarY,
+     * sidebarW, sidebarH]}. The canvas is the largest heavyweight Canvas (the game) in the
+     * maximized window; the sidebar is RuneLite's, when it's showing.
      */
     public static int[] layout() {
         return layout;
@@ -177,8 +178,18 @@ public final class ScreenCompositor {
                 List<Rectangle> canvases = heavyweightCanvases(w);
                 Rectangle game = largest(canvases);
                 if (game != null) {
-                    newLayout = new int[]{game.x, game.y, game.width, game.height,
-                            w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                    // RuneLite's sidebar, so the phone's slide-in panel shows exactly it (not
+                    // whatever is between the game canvas and it)
+                    javax.swing.JTabbedPane sb = Sidebar.find(w);
+                    if (sb != null && sb.isShowing() && sb.getWidth() > 0) {
+                        Point p = sb.getLocationOnScreen();
+                        newLayout = new int[]{game.x, game.y, game.width, game.height,
+                                w.getX(), w.getY(), w.getWidth(), w.getHeight(),
+                                p.x, p.y, sb.getWidth(), sb.getHeight()};
+                    } else {
+                        newLayout = new int[]{game.x, game.y, game.width, game.height,
+                                w.getX(), w.getY(), w.getWidth(), w.getHeight()};
+                    }
                 }
                 Overlay layer = mainLayer(w, canvases);
                 if (layer != null) next.add(0, layer); // under dialogs

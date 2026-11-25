@@ -88,7 +88,8 @@ public final class Sidebar {
         return null;
     }
 
-    private static JTabbedPane find(Container c) {
+    /** RuneLite's sidebar (the right-hand tabbed pane) inside c, or null. */
+    static JTabbedPane find(Container c) {
         for (Component k : c.getComponents()) {
             if (k instanceof JTabbedPane && ((JTabbedPane) k).getTabPlacement() == JTabbedPane.RIGHT) {
                 return (JTabbedPane) k;

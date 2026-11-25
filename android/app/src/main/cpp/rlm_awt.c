@@ -200,7 +200,7 @@ Java_com_jblors_runelitemobile_AwtBridge_sendScroll(JNIEnv *aenv, jclass clazz, 
     check_clear(jenv, "wheel");
 }
 
-// ScreenCompositor.layout(): {canvasX, canvasY, canvasW, canvasH, winX, winY, winW, winH} or null
+// ScreenCompositor.layout(): {canvasX, canvasY, canvasW, canvasH, winX, winY, winW, winH[, sidebarX, sidebarY, sidebarW, sidebarH]} or null
 static jmethodID m_layout;
 JNIEXPORT jintArray JNICALL
 Java_com_jblors_runelitemobile_AwtBridge_layout(JNIEnv *aenv, jclass clazz) {
@@ -212,9 +212,9 @@ Java_com_jblors_runelitemobile_AwtBridge_layout(JNIEnv *aenv, jclass clazz) {
     }
     jintArray src = (jintArray) (*jenv)->CallStaticObjectMethod(jenv, cls_screen, m_layout);
     if (clear_quiet(jenv) || src == NULL) return NULL;
-    jint buf[8];
+    jint buf[12]; // canvas (4), window (4), and RuneLite's sidebar (4) when known
     jsize n = (*jenv)->GetArrayLength(jenv, src);
-    if (n > 8) n = 8;
+    if (n > 12) n = 12;
     (*jenv)->GetIntArrayRegion(jenv, src, 0, n, buf);
     (*jenv)->DeleteLocalRef(jenv, src);
     jintArray out = (*aenv)->NewIntArray(aenv, n);

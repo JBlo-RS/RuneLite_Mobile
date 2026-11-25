@@ -98,6 +98,35 @@ final class KeyboardSink extends View {
                 return handleKey(event);
             }
 
+            /**
+             * The keyboard's own Paste (clipboard panel, edit panel), Select all, Copy and Cut:
+             * keyboards ask the text box to do these, and there's no text box here, so paste
+             * types the clipboard's text into whatever has focus in RuneLite (any field, even
+             * a password field or the game's chat), and the others become Ctrl+A/C/X.
+             */
+            @Override
+            public boolean performContextMenuAction(int id) {
+                if (id == android.R.id.paste || id == android.R.id.pasteAsPlainText) {
+                    String text = clipboardText();
+                    if (text == null || text.isEmpty()) return true;
+                    composing = "";
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
+                        if (c == '\n') AwtBridge.tapKey(KeyMap.VK_ENTER);
+                        else if (c != '\r') AwtBridge.typeChar(c);
+                    }
+                    listener.onText("pasted " + text.length() + " characters");
+                    return true;
+                }
+                int letter = id == android.R.id.selectAll ? 'A' : id == android.R.id.copy ? 'C'
+                        : id == android.R.id.cut ? 'X' : 0;
+                if (letter == 0) return false;
+                AwtBridge.key(KeyMap.VK_CONTROL, true);
+                AwtBridge.tapKey(letter);
+                AwtBridge.key(KeyMap.VK_CONTROL, false);
+                return true;
+            }
+
             @Override
             public boolean performEditorAction(int actionCode) {
                 AwtBridge.tapKey(KeyMap.VK_ENTER);
@@ -105,6 +134,19 @@ final class KeyboardSink extends View {
                 return true;
             }
         };
+    }
+
+    /** Android's clipboard text (this runs on the main thread, where reading it is allowed). */
+    private String clipboardText() {
+        try {
+            android.content.ClipboardManager cm = getContext().getSystemService(android.content.ClipboardManager.class);
+            android.content.ClipData clip = cm == null ? null : cm.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) return null;
+            CharSequence t = clip.getItemAt(0).coerceToText(getContext());
+            return t == null ? null : t.toString();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** Turns the old composing text into the new one with backspaces + typed chars. */

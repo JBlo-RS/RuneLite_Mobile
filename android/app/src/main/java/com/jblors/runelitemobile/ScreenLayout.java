@@ -86,8 +86,15 @@ final class ScreenLayout {
         game.src.set(cx, cy, cx + cw, cy + ch);
         fit(game.dst, cw, ch, surfaceW, surfaceH);
 
-        // RuneLite's sidebar: everything right of the game canvas, over the canvas's height
-        int pw = Math.max(0, winRight - (cx + cw));
+        // RuneLite's sidebar, over the canvas's height: where it really is when known (anything
+        // between the canvas and it, such as unpainted window area, stays hidden), else
+        // everything right of the game canvas
+        int panelX = cx + cw, panelRight = winRight;
+        if (awt.length >= 12 && awt[10] > 0) {
+            panelX = awt[8];
+            panelRight = awt[8] + awt[10];
+        }
+        int pw = Math.max(0, panelRight - panelX);
         panelSrcWidth = pw;
         int inset = Math.min(cornerInset, surfaceH / 6);
         int panelH = surfaceH - 2 * inset;
@@ -103,7 +110,7 @@ final class ScreenLayout {
             mappings = new Mapping[]{game};
         } else {
             Mapping panel = new Mapping();
-            panel.src.set(cx + cw, cy, winRight, cy + ch);
+            panel.src.set(panelX, cy, panelRight, cy + ch);
             int left = surfaceW - Math.round(panelWidthPx * panelProgress);
             panel.dst.set(left, inset, left + panelWidthPx, inset + panelH);
             mappings = new Mapping[]{game, panel};
