@@ -93,6 +93,8 @@ public final class ScreenCompositor {
     public static void start() {
         if (started) return;
         started = true;
+        SwingFixes.install(); // before RuneLite builds its UI
+
         EventQueue.invokeLater(() -> {
             RepaintManager.setCurrentManager(new TrackingRepaintManager());
             new javax.swing.Timer(33, e -> refresh()).start();
