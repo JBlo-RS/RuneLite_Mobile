@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        url = 'https://repo.runelite.net'
+    }
+    mavenCentral()
+}
+
+def runeLiteVersion = 'latest.release'
+
+dependencies {
+    compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+}
+
+group = 'com.starhopper'
+version = '1.0.0'
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // RuneLite plugins must be Java 11 bytecode (also what RuneLite Mobile expects)
+    options.release.set(11)
+}
+
+jar {
+    archiveBaseName.set('star-hopper')
+}
